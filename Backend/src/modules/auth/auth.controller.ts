@@ -14,7 +14,10 @@ export class AuthController {
         res.status(400).json({
           error: 'ValidationError',
           message: error.errors[0]?.message || 'Invalid input data',
-          details: error.errors,
+          details: error.errors.map((err) => ({
+            field: err.path.join('.'),
+            message: err.message,
+          })),
         });
         return;
       }
@@ -35,7 +38,10 @@ export class AuthController {
         res.status(400).json({
           error: 'ValidationError',
           message: error.errors[0]?.message || 'Invalid credentials input',
-          details: error.errors,
+          details: error.errors.map((err) => ({
+            field: err.path.join('.'),
+            message: err.message,
+          })),
         });
         return;
       }

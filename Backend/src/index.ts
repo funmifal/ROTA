@@ -12,6 +12,17 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Security middleware: Passwords must NEVER be transmitted in URLs or query parameters
+app.use((req: Request, res: Response, next) => {
+  if (req.query && ('password' in req.query || 'pass' in req.query || 'pwd' in req.query)) {
+    return res.status(400).json({
+      error: 'SecurityViolation',
+      message: 'Passwords must never be transmitted in a URL or query string.',
+    });
+  }
+  next();
+});
+
 // Health route (required by Checkpoint 2)
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
