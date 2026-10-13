@@ -4,13 +4,7 @@
     "slug": "rota",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#2f6b5f"
-    },
     "ios": {
       "supportsTablet": true
     },
