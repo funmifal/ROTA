@@ -151,6 +151,22 @@ export class AuthController {
     }
   }
 
+  static async verifyCode(req: Request, res: Response): Promise<void> {
+    try {
+      const { email, code } = req.body;
+      if (!email || !code) {
+        res.status(400).json({ error: 'ValidationError', message: 'Email address and verification code are required.' });
+        return;
+      }
+
+      const result = await AuthService.verifyCode(email, code);
+      res.status(200).json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Verification failed.';
+      res.status(400).json({ error: 'VerificationError', message });
+    }
+  }
+
   static async resendVerification(req: Request, res: Response): Promise<void> {
     try {
       const { email } = req.body;

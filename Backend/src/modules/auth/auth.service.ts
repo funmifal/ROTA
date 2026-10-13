@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../database/prisma';
 import { config } from '../../config/env';
 import { EmailService } from '../../services/email.service';
+import { generateSecureVerificationCode } from '../../utils/crypto.util';
 import { RegisterInput, LoginInput } from './auth.validation';
 
 export interface AuthResponse {
@@ -40,6 +41,8 @@ export class AuthService {
 
     // Generate cryptographically secure one-time verification token (24-hour expiration)
     const verificationToken = crypto.randomBytes(32).toString('hex');
+    // Generate cryptographically secure 6-digit verification code using crypto.randomBytes and rejection sampling
+    const verificationCode = generateSecureVerificationCode(6);
     const verificationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const user = await prisma.user.create({
@@ -48,6 +51,7 @@ export class AuthService {
         email: normalizedEmail,
         passwordHash,
         verificationToken,
+        verificationCode,
         verificationTokenExpiresAt,
       },
       select: {
@@ -59,10 +63,9 @@ export class AuthService {
       },
     });
 
-    // Send one-time email verification link using Nodemailer
-    EmailService.sendVerificationEmail(user.email, user.name, verificationToken).catch((err) => {
-      // Log failure internally without throwing to prevent registration interruption
-      // Background retries can pick up or user can request a resend
+    // Send one-time email verification link and code using Nodemailer
+    EmailService.sendVerificationEmail(user.email, user.name, verificationToken, verificationCode).catch(() => {
+      // Background retry / resend available
     });
 
     const token = this.generateToken(user.id, user.email);
@@ -72,7 +75,7 @@ export class AuthService {
 
   /**
    * Verifies an email using the one-time verification token.
-   * Atomically invalidates the token so it cannot be reused.
+   * Atomically invalidates the token and code so they cannot be reused.
    */
   static async verifyEmail(token: string): Promise<{ success: boolean; message: string; email: string }> {
     if (!token || typeof token !== 'string') {
@@ -91,12 +94,13 @@ export class AuthService {
       throw new Error('This verification link has expired. Please request a new one.');
     }
 
-    // Atomically mark verified and clear the token to ensure strictly ONE-TIME usage
+    // Atomically mark verified and clear both token and code to ensure strictly ONE-TIME usage
     await prisma.user.update({
       where: { id: user.id },
       data: {
         emailVerifiedAt: new Date(),
         verificationToken: null,
+        verificationCode: null,
         verificationTokenExpiresAt: null,
       },
     });
@@ -109,7 +113,51 @@ export class AuthService {
   }
 
   /**
-   * Resends a fresh one-time verification email link.
+   * Verifies an email using the 6-digit verification code.
+   * Atomically invalidates the code and link upon success.
+   */
+  static async verifyCode(email: string, code: string): Promise<{ success: boolean; message: string; email: string }> {
+    if (!email || !code) {
+      throw new Error('Email address and verification code are required.');
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user || !user.verificationCode) {
+      throw new Error('Invalid or already used verification code.');
+    }
+
+    if (user.verificationCode !== code.trim()) {
+      throw new Error('Incorrect verification code. Please check your email and try again.');
+    }
+
+    if (user.verificationTokenExpiresAt && user.verificationTokenExpiresAt < new Date()) {
+      throw new Error('This verification code has expired. Please request a new one.');
+    }
+
+    // Atomically mark verified and clear code and token
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifiedAt: new Date(),
+        verificationToken: null,
+        verificationCode: null,
+        verificationTokenExpiresAt: null,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Email address successfully verified! Your Rota account is active.',
+      email: user.email,
+    };
+  }
+
+  /**
+   * Resends a fresh one-time verification email link and 6-digit code.
    */
   static async resendVerification(email: string): Promise<{ message: string }> {
     const normalizedEmail = email.trim().toLowerCase();
@@ -126,21 +174,23 @@ export class AuthService {
       return { message: 'This account has already been verified.' };
     }
 
-    // Generate fresh one-time token with renewed 24-hour expiration
+    // Generate fresh one-time token and code with renewed 24-hour expiration
     const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationCode = generateSecureVerificationCode(6);
     const verificationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     await prisma.user.update({
       where: { id: user.id },
       data: {
         verificationToken,
+        verificationCode,
         verificationTokenExpiresAt,
       },
     });
 
-    await EmailService.sendVerificationEmail(user.email, user.name, verificationToken);
+    await EmailService.sendVerificationEmail(user.email, user.name, verificationToken, verificationCode);
 
-    return { message: 'A new one-time verification link has been sent to your email.' };
+    return { message: 'A new one-time verification link and code have been sent to your email.' };
   }
 
   static async login(input: LoginInput): Promise<AuthResponse> {

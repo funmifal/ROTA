@@ -45,19 +45,32 @@ export class EmailService {
   }
 
   /**
-   * Sends a one-time email verification link using Nodemailer.
+   * Sends a one-time email verification link and 6-digit verification code using Nodemailer.
    *
    * @param to Recipient email address
    * @param name User's full name
    * @param token Cryptographically secure one-time verification token
+   * @param code Optional 6-digit verification code
    */
   static async sendVerificationEmail(
     to: string,
     name: string,
-    token: string
+    token: string,
+    code?: string
   ): Promise<{ messageId: string; previewUrl?: string | false }> {
     const transporter = await this.getTransporter();
     const verificationUrl = `${config.appUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+
+    const codeSectionHtml = code
+      ? `
+    <div style="margin: 24px 0; text-align: center;">
+      <p style="margin-bottom: 8px; font-size: 13px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Your Verification Code</p>
+      <div style="display: inline-block; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #006a60; background: #e6f4ea; padding: 16px 28px; border-radius: 10px; border: 1px dashed #006a60; font-family: monospace;">
+        ${code}
+      </div>
+    </div>
+      `
+      : '';
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -84,11 +97,12 @@ export class EmailService {
     <h1>Verify Your Email Address</h1>
     <p>Hi ${escapeHtml(name)},</p>
     <p>Thank you for creating an account on Rota. Please verify your email address to activate your workforce management account.</p>
+    ${codeSectionHtml}
     <div class="btn-container">
       <a href="${verificationUrl}" class="btn" target="_blank">Verify Email Address</a>
     </div>
     <div class="note">
-      This one-time verification link is valid for <strong>24 hours</strong>. Once used, it will automatically expire.
+      This one-time verification link and code are valid for <strong>24 hours</strong>. Once used, they will automatically expire.
     </div>
     <p class="fallback">
       If the button above does not work, copy and paste this link into your browser:<br>
@@ -105,11 +119,12 @@ export class EmailService {
     const textContent = `
 Hi ${name},
 
-Thank you for creating an account on Rota. Please verify your email address by clicking the link below:
-
+Thank you for creating an account on Rota. Please verify your email address.
+${code ? `Your 6-digit verification code is: ${code}\n\n` : ''}
+Or click the link below to verify directly:
 ${verificationUrl}
 
-This one-time verification link is valid for 24 hours.
+This one-time verification link and code are valid for 24 hours.
 
 If you did not sign up for Rota, you can safely ignore this email.
     `.trim();
