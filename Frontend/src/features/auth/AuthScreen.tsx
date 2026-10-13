@@ -258,6 +258,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     }
   };
 
+  // Button disabled when fields are not filled with data; enables when last piece of data is filled
+  const isFormFilled = isLoginTab
+    ? Boolean(email.trim() && password)
+    : Boolean(name.trim() && email.trim() && password);
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -361,6 +366,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           <Button
             title={isLoginTab ? 'Log In' : 'Create Account'}
             onPress={handleSubmit}
+            disabled={!isFormFilled}
             loading={loading}
             style={styles.submitButton}
           />
