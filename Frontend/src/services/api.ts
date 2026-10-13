@@ -352,14 +352,52 @@ export const api = {
     });
   },
 
-  async getSwaps(businessId: string): Promise<{ swaps: SwapRequestItem[] }> {
-    return request<{ swaps: SwapRequestItem[] }>(`/api/businesses/${businessId}/swaps`);
+  // Push Notifications & Device Registration (Requirement 6)
+  async registerDevice(data: {
+    deviceId: string;
+    pushToken: string;
+    platform?: string;
+    deviceName?: string;
+  }): Promise<{ message: string; device: any }> {
+    return request('/api/notifications/devices', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async unregisterDevice(deviceId: string): Promise<{ message: string }> {
+    return request(`/api/notifications/devices/${deviceId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async getNotifications(): Promise<{ notifications: any[]; unreadCount: number }> {
+    return request('/api/notifications');
+  },
+
+  async markNotificationRead(notificationId: string): Promise<{ message: string }> {
+    return request(`/api/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+    });
+  },
+
+  async markAllNotificationsRead(): Promise<{ message: string }> {
+    return request('/api/notifications/read-all', {
+      method: 'PATCH',
+    });
   },
 };
 
 export interface UserSettings {
   id?: string;
   notificationsEnabled: boolean;
+  notifyShiftChanges?: boolean;
+  notifySwaps?: boolean;
+  notifyBilling?: boolean;
+  quietHoursEnabled?: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+  timezone?: string;
   emailAlerts: boolean;
   shiftReminders: boolean;
   timeFormat24h: boolean;

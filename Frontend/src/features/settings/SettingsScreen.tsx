@@ -137,6 +137,86 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onLogout
 
               <View style={styles.settingItem}>
                 <View style={styles.settingLeft}>
+                  <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
+                  <View style={styles.settingTextContainer}>
+                    <Text style={styles.settingTitle}>Shift Changes</Text>
+                    <Text style={styles.settingDescription}>
+                      Alerts when shifts are assigned, edited, or published
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={settings?.notifyShiftChanges ?? true}
+                  onValueChange={(val) => handleToggle('notifyShiftChanges', val)}
+                  trackColor={{ false: Colors.surfaceContainer, true: Colors.primaryContainer }}
+                  thumbColor={settings?.notifyShiftChanges ? Colors.primary : Colors.neutralContainer}
+                />
+              </View>
+
+              <View style={styles.settingItemDivider} />
+
+              <View style={styles.settingItem}>
+                <View style={styles.settingLeft}>
+                  <Ionicons name="swap-horizontal-outline" size={20} color={Colors.primary} />
+                  <View style={styles.settingTextContainer}>
+                    <Text style={styles.settingTitle}>Swap Requests</Text>
+                    <Text style={styles.settingDescription}>
+                      Alerts for incoming swap requests and manager approvals
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={settings?.notifySwaps ?? true}
+                  onValueChange={(val) => handleToggle('notifySwaps', val)}
+                  trackColor={{ false: Colors.surfaceContainer, true: Colors.primaryContainer }}
+                  thumbColor={settings?.notifySwaps ? Colors.primary : Colors.neutralContainer}
+                />
+              </View>
+
+              <View style={styles.settingItemDivider} />
+
+              <View style={styles.settingItem}>
+                <View style={styles.settingLeft}>
+                  <Ionicons name="card-outline" size={20} color={Colors.primary} />
+                  <View style={styles.settingTextContainer}>
+                    <Text style={styles.settingTitle}>Billing & Plan Alerts</Text>
+                    <Text style={styles.settingDescription}>
+                      Subscription renewal, seat upgrade, and payment alerts
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={settings?.notifyBilling ?? true}
+                  onValueChange={(val) => handleToggle('notifyBilling', val)}
+                  trackColor={{ false: Colors.surfaceContainer, true: Colors.primaryContainer }}
+                  thumbColor={settings?.notifyBilling ? Colors.primary : Colors.neutralContainer}
+                />
+              </View>
+
+              <View style={styles.settingItemDivider} />
+
+              <View style={styles.settingItem}>
+                <View style={styles.settingLeft}>
+                  <Ionicons name="moon-outline" size={20} color={Colors.primary} />
+                  <View style={styles.settingTextContainer}>
+                    <Text style={styles.settingTitle}>Quiet Hours (Do Not Disturb)</Text>
+                    <Text style={styles.settingDescription}>
+                      Suppress non-urgent push alerts between 22:00 and 08:00
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={settings?.quietHoursEnabled ?? false}
+                  onValueChange={(val) => handleToggle('quietHoursEnabled', val)}
+                  trackColor={{ false: Colors.surfaceContainer, true: Colors.primaryContainer }}
+                  thumbColor={settings?.quietHoursEnabled ? Colors.primary : Colors.neutralContainer}
+                />
+              </View>
+
+              <View style={styles.settingItemDivider} />
+
+              <View style={styles.settingItem}>
+                <View style={styles.settingLeft}>
                   <Ionicons name="alarm-outline" size={20} color={Colors.primary} />
                   <View style={styles.settingTextContainer}>
                     <Text style={styles.settingTitle}>Shift Reminders</Text>

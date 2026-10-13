@@ -4,12 +4,14 @@ import { config } from './config/env';
 import authRoutes from './modules/auth/auth.routes';
 import { initializeEmailQueue } from './queues/email.queue';
 import { initializeWebhookQueue } from './queues/webhook.queue';
+import { initializePushNotificationQueue } from './queues/notification.queue';
 
 const app = express();
 
 // Initialize BullMQ background queues & workers
 initializeEmailQueue();
 initializeWebhookQueue();
+initializePushNotificationQueue();
 
 // Middleware
 app.use(cors({
@@ -60,9 +62,11 @@ app.use('/api/businesses/:businessId', swapRoutes);
 app.use('/api/businesses/:businessId/billing', billingRoutes);
 app.use('/api/businesses/:businessId/subscription', billingRoutes);
 import { BillingController } from './modules/billing/billing.controller';
+import notificationRoutes from './modules/notifications/notification.routes';
 app.use('/api/invitations', invitationRoutes);
 app.post('/api/billing/webhook', BillingController.handleWebhook);
 app.use('/api/billing', billingRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Protected dashboard route (required by Checkpoint 2: "Add a protected route the dashboard can call.")
 import { requireAuth } from './middleware/auth';
