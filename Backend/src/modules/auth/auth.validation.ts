@@ -20,7 +20,13 @@ export const registerSchema = z.object({
   middleName: z.string().trim().optional(),
   lastName: z.string().trim().optional(),
   email: z.string().trim().email('Enter A Valid Email Address').toLowerCase(),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z
+    .string()
+    .min(8, 'Minimum Of 8 Characters')
+    .refine((val) => /[a-z]/.test(val), { message: 'Password must contain a lowercase letter' })
+    .refine((val) => /[A-Z]/.test(val), { message: 'Password must contain an uppercase letter' })
+    .refine((val) => /[0-9]/.test(val), { message: 'Password must contain a number' })
+    .refine((val) => /[#@>^\W_]/.test(val), { message: 'Password must contain a special character(#@>^)' }),
 });
 
 export const loginSchema = z.object({

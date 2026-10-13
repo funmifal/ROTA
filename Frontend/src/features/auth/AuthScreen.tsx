@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Effects } from '../../theme/tokens';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -166,6 +167,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     setEmailSuccess(true);
   };
 
+  const handlePasswordChange = (text: string) => {
+    setPassword(text);
+    if (passwordSuccess) setPasswordSuccess(false);
+
+    if (passwordError) {
+      if (isLoginTab) {
+        setPasswordError('');
+      } else {
+        const allMet =
+          text.length >= 8 &&
+          /[a-z]/.test(text) &&
+          /[A-Z]/.test(text) &&
+          /[0-9]/.test(text) &&
+          /[#@>^\W_]/.test(text);
+        if (allMet) {
+          setPasswordError('');
+        }
+      }
+    }
+  };
+
   const handlePasswordBlur = () => {
     // Trim empty spaces at the end
     const trimmed = password.trimEnd();
@@ -176,10 +198,32 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       setPasswordSuccess(false);
       return;
     }
-    if (!isLoginTab && trimmed.length < 8) {
-      setPasswordError('Password must be at least 8 characters');
-      setPasswordSuccess(false);
-      return;
+    if (!isLoginTab) {
+      if (trimmed.length < 8) {
+        setPasswordError('Minimum Of 8 Characters');
+        setPasswordSuccess(false);
+        return;
+      }
+      if (!/[a-z]/.test(trimmed)) {
+        setPasswordError('Password must contain a lowercase letter');
+        setPasswordSuccess(false);
+        return;
+      }
+      if (!/[A-Z]/.test(trimmed)) {
+        setPasswordError('Password must contain an uppercase letter');
+        setPasswordSuccess(false);
+        return;
+      }
+      if (!/[0-9]/.test(trimmed)) {
+        setPasswordError('Password must contain a number');
+        setPasswordSuccess(false);
+        return;
+      }
+      if (!/[#@>^\W_]/.test(trimmed)) {
+        setPasswordError('Password must contain a special character(#@>^)');
+        setPasswordSuccess(false);
+        return;
+      }
     }
 
     // Success state
@@ -223,9 +267,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     if (!password) {
       setPasswordError('Password field cannot be empty');
       isValid = false;
-    } else if (!isLoginTab && password.length < 8) {
-      setPasswordError('Password must be at least 8 characters');
-      isValid = false;
+    } else if (!isLoginTab) {
+      if (password.length < 8) {
+        setPasswordError('Minimum Of 8 Characters');
+        isValid = false;
+      } else if (!/[a-z]/.test(password)) {
+        setPasswordError('Password must contain a lowercase letter');
+        isValid = false;
+      } else if (!/[A-Z]/.test(password)) {
+        setPasswordError('Password must contain an uppercase letter');
+        isValid = false;
+      } else if (!/[0-9]/.test(password)) {
+        setPasswordError('Password must contain a number');
+        isValid = false;
+      } else if (!/[#@>^\W_]/.test(password)) {
+        setPasswordError('Password must contain a special character(#@>^)');
+        isValid = false;
+      }
     }
 
     return isValid;
@@ -262,6 +320,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const isFormFilled = isLoginTab
     ? Boolean(email.trim() && password)
     : Boolean(name.trim() && email.trim() && password);
+
+  // Real-time password requirement checklist for Create Account
+  const passwordRequirements = {
+    hasMinLength: password.length >= 8,
+    hasLowercase: /[a-z]/.test(password),
+    hasUppercase: /[A-Z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecialChar: /[#@>^\W_]/.test(password),
+  };
 
   return (
     <KeyboardAvoidingView
@@ -350,17 +417,105 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             label="Password"
             value={password}
             isPassword
-            onChangeText={(text) => {
-              setPassword(text);
-              if (passwordError) setPasswordError('');
-              if (passwordSuccess) setPasswordSuccess(false);
-            }}
+            onChangeText={handlePasswordChange}
             onBlur={handlePasswordBlur}
             placeholder={isLoginTab ? 'Enter your password' : 'Min. 8 characters'}
             autoCapitalize="none"
             error={passwordError}
             success={passwordSuccess}
           />
+
+          {/* Password Requirements Checklist (Create Account only) */}
+          {!isLoginTab && (
+            <View style={styles.passwordRequirementsContainer}>
+              <Text style={styles.requirementsHeader}>Password Requirements</Text>
+
+              <View style={styles.requirementRow}>
+                <Ionicons
+                  name={passwordRequirements.hasMinLength ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={14}
+                  color={passwordRequirements.hasMinLength ? Colors.success : Colors.neutral}
+                  style={styles.requirementIcon}
+                />
+                <Text
+                  style={[
+                    styles.requirementText,
+                    passwordRequirements.hasMinLength && styles.requirementMetText,
+                  ]}
+                >
+                  Minimum Of 8 Characters
+                </Text>
+              </View>
+
+              <View style={styles.requirementRow}>
+                <Ionicons
+                  name={passwordRequirements.hasLowercase ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={14}
+                  color={passwordRequirements.hasLowercase ? Colors.success : Colors.neutral}
+                  style={styles.requirementIcon}
+                />
+                <Text
+                  style={[
+                    styles.requirementText,
+                    passwordRequirements.hasLowercase && styles.requirementMetText,
+                  ]}
+                >
+                  Password must contain a lowercase letter
+                </Text>
+              </View>
+
+              <View style={styles.requirementRow}>
+                <Ionicons
+                  name={passwordRequirements.hasUppercase ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={14}
+                  color={passwordRequirements.hasUppercase ? Colors.success : Colors.neutral}
+                  style={styles.requirementIcon}
+                />
+                <Text
+                  style={[
+                    styles.requirementText,
+                    passwordRequirements.hasUppercase && styles.requirementMetText,
+                  ]}
+                >
+                  Password must contain an uppercase letter
+                </Text>
+              </View>
+
+              <View style={styles.requirementRow}>
+                <Ionicons
+                  name={passwordRequirements.hasNumber ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={14}
+                  color={passwordRequirements.hasNumber ? Colors.success : Colors.neutral}
+                  style={styles.requirementIcon}
+                />
+                <Text
+                  style={[
+                    styles.requirementText,
+                    passwordRequirements.hasNumber && styles.requirementMetText,
+                  ]}
+                >
+                  Password must contain a number
+                </Text>
+              </View>
+
+              <View style={styles.requirementRow}>
+                <Ionicons
+                  name={passwordRequirements.hasSpecialChar ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={14}
+                  color={passwordRequirements.hasSpecialChar ? Colors.success : Colors.neutral}
+                  style={styles.requirementIcon}
+                />
+                <Text
+                  style={[
+                    styles.requirementText,
+                    passwordRequirements.hasSpecialChar && styles.requirementMetText,
+                  ]}
+                >
+                  {'Password must contain a special character(#@>^)'}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Submit Button */}
           <Button
@@ -445,5 +600,39 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: Spacing.smallSpacing,
+  },
+  passwordRequirementsContainer: {
+    backgroundColor: Colors.surfaceContainerLow,
+    borderRadius: 8,
+    padding: Spacing.mediumSpacing,
+    marginBottom: Spacing.baseSpacing,
+    borderWidth: 1,
+    borderColor: Colors.neutralContainer,
+  },
+  requirementsHeader: {
+    fontSize: Typography.labelSmall.fontSize,
+    lineHeight: Typography.labelSmall.lineHeight,
+    fontWeight: '600',
+    color: Colors.neutral,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  requirementRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  requirementIcon: {
+    marginRight: 6,
+  },
+  requirementText: {
+    fontSize: Typography.bodySmall.fontSize,
+    lineHeight: Typography.bodySmall.lineHeight,
+    color: Colors.neutral,
+  },
+  requirementMetText: {
+    color: Colors.success,
+    fontWeight: '500',
   },
 });
