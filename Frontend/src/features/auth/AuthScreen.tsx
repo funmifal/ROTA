@@ -344,6 +344,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           <Input
             label="Password"
             value={password}
+            isPassword
             onChangeText={(text) => {
               setPassword(text);
               if (passwordError) setPasswordError('');
@@ -351,7 +352,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             }}
             onBlur={handlePasswordBlur}
             placeholder={isLoginTab ? 'Enter your password' : 'Min. 8 characters'}
-            secureTextEntry
             autoCapitalize="none"
             error={passwordError}
             success={passwordSuccess}
