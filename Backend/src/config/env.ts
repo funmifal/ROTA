@@ -12,6 +12,7 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || 'default-fallback-secret-rota',
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
   bcryptSaltRounds,
+  verificationCodeExpiryMinutes: parseInt(process.env.EMAIL_VERIFICATION_EXPIRY_MINUTES || '15', 10),
   email: {
     from: process.env.EMAIL_FROM || 'Rota <noreply@rotaapp.com>',
     smtp: {

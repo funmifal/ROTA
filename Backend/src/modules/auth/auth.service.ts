@@ -28,6 +28,33 @@ export class AuthService {
   private static readonly SALT_ROUNDS = config.bcryptSaltRounds;
   private static readonly TOKEN_EXPIRY = '7d';
 
+  /**
+   * Helper to generate and store temporary email verification details in the EmailVerified table.
+   * Details are valid for the configured period (default 15 minutes).
+   */
+  private static async createTemporaryVerification(email: string): Promise<{ token: string; code: string; expiresAt: Date }> {
+    const token = crypto.randomBytes(32).toString('hex');
+    const code = generateSecureVerificationCode(6);
+    const expiresAt = new Date(Date.now() + config.verificationCodeExpiryMinutes * 60 * 1000);
+
+    await prisma.emailVerified.upsert({
+      where: { email },
+      create: {
+        email,
+        code,
+        token,
+        expiresAt,
+      },
+      update: {
+        code,
+        token,
+        expiresAt,
+      },
+    });
+
+    return { token, code, expiresAt };
+  }
+
   static async register(input: RegisterInput): Promise<AuthResponse> {
     const normalizedEmail = input.email.trim().toLowerCase();
     const existing = await prisma.user.findUnique({
@@ -40,20 +67,11 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(input.password, this.SALT_ROUNDS);
 
-    // Generate cryptographically secure one-time verification token (24-hour expiration)
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    // Generate cryptographically secure 6-digit verification code using crypto.randomBytes and rejection sampling
-    const verificationCode = generateSecureVerificationCode(6);
-    const verificationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
     const user = await prisma.user.create({
       data: {
         name: input.name.trim(),
         email: normalizedEmail,
         passwordHash,
-        verificationToken,
-        verificationCode,
-        verificationTokenExpiresAt,
       },
       select: {
         id: true,
@@ -63,6 +81,10 @@ export class AuthService {
         emailVerifiedAt: true,
       },
     });
+
+    // Generate verification details and store temporarily in the EmailVerified table
+    const { token: verificationToken, code: verificationCode } =
+      await this.createTemporaryVerification(user.email);
 
     // Enqueue background job to send verification email with 6-digit code via BullMQ
     enqueueVerificationEmail({
@@ -79,34 +101,48 @@ export class AuthService {
 
   /**
    * Verifies an email using the one-time verification token.
-   * Atomically invalidates the token and code so they cannot be reused.
+   * Atomically invalidates and deletes the temporary EmailVerified record upon success.
    */
   static async verifyEmail(token: string): Promise<{ success: boolean; message: string; email: string }> {
     if (!token || typeof token !== 'string') {
       throw new Error('Invalid verification token.');
     }
 
-    const user = await prisma.user.findUnique({
-      where: { verificationToken: token },
+    // Lookup temporary record in EmailVerified table
+    const verificationRecord = await prisma.emailVerified.findFirst({
+      where: { token },
     });
 
-    if (!user) {
-      throw new Error('Invalid or already used verification link.');
+    if (!verificationRecord) {
+      throw new Error('Invalid or already used verification link. Please request a new one.');
     }
 
-    if (user.verificationTokenExpiresAt && user.verificationTokenExpiresAt < new Date()) {
+    // Check code/token expiration period
+    if (verificationRecord.expiresAt < new Date()) {
+      await prisma.emailVerified.delete({ where: { id: verificationRecord.id } }).catch(() => {});
       throw new Error('This verification link has expired. Please request a new one.');
     }
 
-    // Atomically mark verified and clear both token and code to ensure strictly ONE-TIME usage
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailVerifiedAt: new Date(),
-        verificationToken: null,
-        verificationCode: null,
-        verificationTokenExpiresAt: null,
-      },
+    const user = await prisma.user.findUnique({
+      where: { email: verificationRecord.email },
+    });
+
+    if (!user) {
+      throw new Error('User account not found for this verification link.');
+    }
+
+    // Atomically mark user verified and delete temporary record from EmailVerified table
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerifiedAt: new Date(),
+        },
+      });
+
+      await tx.emailVerified.deleteMany({
+        where: { email: verificationRecord.email },
+      });
     });
 
     return {
@@ -118,7 +154,7 @@ export class AuthService {
 
   /**
    * Verifies an email using the 6-digit verification code.
-   * Atomically invalidates the code and link upon success.
+   * Checks expiration period and deletes the temporary record from EmailVerified upon success.
    */
   static async verifyCode(email: string, code: string): Promise<{ success: boolean; message: string; email: string }> {
     if (!email || !code) {
@@ -130,27 +166,50 @@ export class AuthService {
       where: { email: normalizedEmail },
     });
 
-    if (!user || !user.verificationCode) {
-      throw new Error('Invalid or already used verification code.');
+    if (!user) {
+      throw new Error('Invalid email address.');
     }
 
-    if (user.verificationCode !== code.trim()) {
-      throw new Error('Incorrect verification code. Please check your email and try again.');
+    if (user.emailVerifiedAt) {
+      return {
+        success: true,
+        message: 'Email address has already been verified.',
+        email: user.email,
+      };
     }
 
-    if (user.verificationTokenExpiresAt && user.verificationTokenExpiresAt < new Date()) {
+    // Lookup temporary record in EmailVerified table
+    const verificationRecord = await prisma.emailVerified.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!verificationRecord) {
+      throw new Error('Invalid or already used verification code. Please request a new one.');
+    }
+
+    // Check expiration period
+    if (verificationRecord.expiresAt < new Date()) {
+      // Clean up expired temporary record
+      await prisma.emailVerified.delete({ where: { id: verificationRecord.id } }).catch(() => {});
       throw new Error('This verification code has expired. Please request a new one.');
     }
 
-    // Atomically mark verified and clear code and token
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailVerifiedAt: new Date(),
-        verificationToken: null,
-        verificationCode: null,
-        verificationTokenExpiresAt: null,
-      },
+    if (verificationRecord.code !== code.trim()) {
+      throw new Error('Incorrect verification code. Please check your email and try again.');
+    }
+
+    // Atomically mark verified and delete temporary record from EmailVerified table
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerifiedAt: new Date(),
+        },
+      });
+
+      await tx.emailVerified.deleteMany({
+        where: { email: normalizedEmail },
+      });
     });
 
     return {
@@ -162,6 +221,7 @@ export class AuthService {
 
   /**
    * Resends a fresh one-time verification email link and 6-digit code.
+   * Generates and updates temporary details in the EmailVerified table.
    */
   static async resendVerification(email: string): Promise<{ message: string }> {
     const normalizedEmail = email.trim().toLowerCase();
@@ -178,19 +238,9 @@ export class AuthService {
       return { message: 'This account has already been verified.' };
     }
 
-    // Generate fresh one-time token and code with renewed 24-hour expiration
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationCode = generateSecureVerificationCode(6);
-    const verificationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        verificationToken,
-        verificationCode,
-        verificationTokenExpiresAt,
-      },
-    });
+    // Generate fresh temporary verification details stored in EmailVerified table
+    const { token: verificationToken, code: verificationCode } =
+      await this.createTemporaryVerification(user.email);
 
     await enqueueVerificationEmail({
       email: user.email,
