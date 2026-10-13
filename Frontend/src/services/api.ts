@@ -209,6 +209,18 @@ export const api = {
       method: 'DELETE',
     });
   },
+
+  // Activity Feed (Cursor Pagination)
+  async getActivityFeed(
+    businessId: string,
+    options: { cursor?: string; limit?: number } = {}
+  ): Promise<PaginatedActivityResponse> {
+    const params = new URLSearchParams();
+    if (options.cursor) params.append('cursor', options.cursor);
+    if (options.limit) params.append('limit', options.limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return request<PaginatedActivityResponse>(`/api/businesses/${businessId}/activity${query}`);
+  },
 };
 
 export interface Business {
@@ -243,4 +255,25 @@ export interface TeamInvitation {
   createdAt: string;
   invitedBy?: string;
   inviteUrl: string;
+}
+
+export interface ActivityFeedItem {
+  id: string;
+  action: string;
+  resource: string;
+  resourceId: string | null;
+  metadata: any;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
+}
+
+export interface PaginatedActivityResponse {
+  items: ActivityFeedItem[];
+  nextCursor: string | null;
+  hasNextPage: boolean;
+  limit: number;
 }

@@ -150,6 +150,6 @@ model AuditLog {
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@index([businessId, createdAt])
+  @@index([businessId, createdAt(sort: Desc), id(sort: Desc)], name: "idx_audit_logs_cursor")
   @@map("audit_logs")
 }

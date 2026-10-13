@@ -14,6 +14,7 @@ import { FeedbackBanner } from '../../components/FeedbackBanner';
 import { api, User, Business, DashboardSummary } from '../../services/api';
 import { CreateBusinessModal } from './CreateBusinessModal';
 import { TeamScreen } from '../team/TeamScreen';
+import { ActivityFeedScreen } from '../activity/ActivityFeedScreen';
 
 interface DashboardScreenProps {
   user: User;
@@ -29,6 +30,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
   const [loggingOut, setLoggingOut] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [showTeamScreen, setShowTeamScreen] = useState(false);
+  const [showActivityFeed, setShowActivityFeed] = useState(false);
 
   const fetchInitialData = async () => {
     try {
@@ -81,6 +83,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
           setShowTeamScreen(false);
           fetchInitialData();
         }}
+      />
+    );
+  }
+
+  if (showActivityFeed && activeBusiness) {
+    return (
+      <ActivityFeedScreen
+        business={activeBusiness}
+        onBack={() => setShowActivityFeed(false)}
       />
     );
   }
@@ -174,6 +185,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
                     onPress={() => setShowTeamScreen(true)}
                     variant="primary"
                     style={{ flex: 1 }}
+                  />
+                  <Button
+                    title="Activity Feed"
+                    onPress={() => setShowActivityFeed(true)}
+                    variant="tonal"
+                    style={{ flex: 1, marginLeft: Spacing.smallSpacing }}
                   />
                 </View>
               </View>
@@ -387,6 +404,7 @@ const styles = StyleSheet.create({
     color: Colors.neutral,
   },
   bizActionRow: {
+    flexDirection: 'row',
     marginTop: Spacing.baseSpacing,
   },
   bizSwitcher: {

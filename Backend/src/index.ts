@@ -43,9 +43,11 @@ app.use('/api/auth', authRoutes);
 import businessRoutes from './modules/businesses/business.routes';
 import teamRoutes from './modules/team/team.routes';
 import invitationRoutes from './modules/team/invitation.routes';
+import activityRoutes from './modules/activity/activity.routes';
 
 app.use('/api/businesses', businessRoutes);
 app.use('/api/businesses/:businessId', teamRoutes);
+app.use('/api/businesses/:businessId', activityRoutes);
 app.use('/api/invitations', invitationRoutes);
 
 // Protected dashboard route (required by Checkpoint 2: "Add a protected route the dashboard can call.")
