@@ -16,7 +16,12 @@ export interface AuthResponse {
 }
 
 export class AuthService {
-  private static readonly SALT_ROUNDS = 12;
+  /**
+   * Bcrypt adaptive cost factor (salt rounds).
+   * Enforced to be >= 10 (default: 12, representing 2^12 = 4,096 iterations)
+   * in accordance with OWASP security guidelines for slow, adaptive password hashing.
+   */
+  private static readonly SALT_ROUNDS = config.bcryptSaltRounds;
   private static readonly TOKEN_EXPIRY = '7d';
 
   static async register(input: RegisterInput): Promise<AuthResponse> {
