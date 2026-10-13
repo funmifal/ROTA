@@ -221,7 +221,85 @@ export const api = {
     const query = params.toString() ? `?${params.toString()}` : '';
     return request<PaginatedActivityResponse>(`/api/businesses/${businessId}/activity${query}`);
   },
+
+  // User Settings (Synced across devices)
+  async getSettings(): Promise<{ settings: UserSettings }> {
+    return request<{ settings: UserSettings }>('/api/users/settings');
+  },
+
+  async updateSettings(data: Partial<UserSettings>): Promise<{ message: string; settings: UserSettings }> {
+    return request<{ message: string; settings: UserSettings }>('/api/users/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Shifts & Upcoming Shifts
+  async getUpcomingShifts(businessId: string): Promise<{ shifts: ShiftItem[]; serverTime: string }> {
+    return request<{ shifts: ShiftItem[]; serverTime: string }>(`/api/businesses/${businessId}/shifts/upcoming`);
+  },
+
+  async seedUpcomingShifts(businessId: string): Promise<{ message: string }> {
+    return request<{ message: string }>(`/api/businesses/${businessId}/shifts/seed`, {
+      method: 'POST',
+    });
+  },
+
+  // Shift Swaps (Kemi's Scenario)
+  async requestSwap(
+    businessId: string,
+    data: { shiftAssignmentId: string; reason?: string; targetMembershipId?: string }
+  ): Promise<{ message: string; swapRequest: SwapRequestItem }> {
+    return request<{ message: string; swapRequest: SwapRequestItem }>(`/api/businesses/${businessId}/swaps`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getSwaps(businessId: string): Promise<{ swaps: SwapRequestItem[] }> {
+    return request<{ swaps: SwapRequestItem[] }>(`/api/businesses/${businessId}/swaps`);
+  },
 };
+
+export interface UserSettings {
+  id?: string;
+  notificationsEnabled: boolean;
+  emailAlerts: boolean;
+  shiftReminders: boolean;
+  timeFormat24h: boolean;
+  autoAcceptSwaps: boolean;
+  theme: string;
+}
+
+export interface ShiftItem {
+  id: string;
+  businessId: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  breakMinutes: number;
+  status: string;
+  notes: string | null;
+  department: string | null;
+  location: string | null;
+  isAssignedToMe: boolean;
+  myAssignmentId: string | null;
+  assignedStaffCount: number;
+  swapStatus: string | null;
+  swapRequestId: string | null;
+  canRequestSwap: boolean;
+}
+
+export interface SwapRequestItem {
+  id: string;
+  businessId: string;
+  shiftAssignmentId: string;
+  requesterMembershipId: string;
+  targetMembershipId: string | null;
+  status: 'PENDING' | 'ACCEPTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED';
+  reason: string | null;
+  createdAt: string;
+}
 
 export interface Business {
   id: string;

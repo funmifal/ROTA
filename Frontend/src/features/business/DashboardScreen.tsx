@@ -15,6 +15,9 @@ import { api, User, Business, DashboardSummary } from '../../services/api';
 import { CreateBusinessModal } from './CreateBusinessModal';
 import { TeamScreen } from '../team/TeamScreen';
 import { ActivityFeedScreen } from '../activity/ActivityFeedScreen';
+import { ShiftsScreen } from '../shifts/ShiftsScreen';
+import { SettingsScreen } from '../settings/SettingsScreen';
+import { useAppStore } from '../../state/useAppStore';
 
 interface DashboardScreenProps {
   user: User;
@@ -31,6 +34,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [showTeamScreen, setShowTeamScreen] = useState(false);
   const [showActivityFeed, setShowActivityFeed] = useState(false);
+  const [showShiftsScreen, setShowShiftsScreen] = useState(false);
+  const [showSettingsScreen, setShowSettingsScreen] = useState(false);
 
   const fetchInitialData = async () => {
     try {
@@ -74,6 +79,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
     setActiveBusiness(newBiz);
   };
 
+  if (showShiftsScreen && activeBusiness) {
+    return (
+      <ShiftsScreen
+        business={activeBusiness}
+        onBack={() => {
+          setShowShiftsScreen(false);
+          fetchInitialData();
+        }}
+      />
+    );
+  }
+
+  if (showSettingsScreen) {
+    return (
+      <SettingsScreen
+        onBack={() => setShowSettingsScreen(false)}
+      />
+    );
+  }
+
   if (showTeamScreen && activeBusiness) {
     return (
       <TeamScreen
@@ -104,13 +129,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
           <Text style={styles.appBarTitle}>Rota</Text>
           <Text style={styles.appBarSubtitle}>Workforce & Shifts</Text>
         </View>
-        <Button
-          title="Log Out"
-          variant="tonal"
-          onPress={handleLogout}
-          loading={loggingOut}
-          style={styles.logoutButton}
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            style={styles.settingsIconButton}
+            onPress={() => setShowSettingsScreen(true)}
+            accessibilityLabel="Settings"
+          >
+            <Ionicons name="settings-outline" size={20} color={Colors.onSurface} />
+          </TouchableOpacity>
+          <Button
+            title="Log Out"
+            variant="tonal"
+            onPress={handleLogout}
+            loading={loggingOut}
+            style={styles.logoutButton}
+          />
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -179,11 +213,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
                   </View>
                 </View>
 
+                {/* Primary Action: Upcoming Shifts */}
+                <Button
+                  title="Upcoming Shifts (Offline & Swaps)"
+                  onPress={() => setShowShiftsScreen(true)}
+                  variant="primary"
+                  style={{ marginTop: Spacing.smallSpacing, marginBottom: Spacing.smallSpacing }}
+                />
+
                 <View style={styles.bizActionRow}>
                   <Button
-                    title="Manage Team & Invites"
+                    title="Team & Invites"
                     onPress={() => setShowTeamScreen(true)}
-                    variant="primary"
+                    variant="tonal"
                     style={{ flex: 1 }}
                   />
                   <Button
@@ -231,18 +273,30 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
         </Text>
 
         <View style={styles.overviewGrid}>
-          <View style={styles.statCard}>
+          <TouchableOpacity
+            style={styles.statCard}
+            onPress={() => {
+              if (activeBusiness) setShowShiftsScreen(true);
+            }}
+          >
             <Text style={styles.statNumber}>
               {summary?.overview?.upcomingShiftsCount ?? 0}
             </Text>
             <Text style={styles.statLabel}>Upcoming Shifts</Text>
-          </View>
-          <View style={styles.statCard}>
+            <Text style={styles.tapToViewText}>Tap to View & Swaps</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.statCard}
+            onPress={() => {
+              if (activeBusiness) setShowShiftsScreen(true);
+            }}
+          >
             <Text style={styles.statNumber}>
               {summary?.overview?.pendingSwapsCount ?? 0}
             </Text>
             <Text style={styles.statLabel}>Pending Swaps</Text>
-          </View>
+            <Text style={styles.tapToViewText}>Tap to View</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -467,5 +521,16 @@ const styles = StyleSheet.create({
     color: Colors.neutral,
     marginTop: 4,
     textAlign: 'center',
+  },
+  tapToViewText: {
+    fontSize: 10,
+    color: Colors.primary,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  settingsIconButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.surfaceContainerLow,
   },
 });
