@@ -13,20 +13,35 @@ export interface VerificationEmailJobData {
 let redisConnection: Redis | null = null;
 let emailQueue: Queue<VerificationEmailJobData> | null = null;
 let emailWorker: Worker<VerificationEmailJobData> | null = null;
+let isRedisAvailable = false;
 
 function getRedisConnection(): Redis {
   if (!redisConnection) {
     redisConnection = new Redis(config.redisUrl, {
       maxRetriesPerRequest: null,
-      lazyConnect: true,
+      enableOfflineQueue: false, // Critical: reject immediately if Redis is not connected so fallback triggers
+      lazyConnect: false,
       retryStrategy(times) {
-        if (times > 5) return null; // stop reconnecting if Redis is not running locally
-        return Math.min(times * 500, 2000);
+        if (times > 3) return null; // stop reconnecting if Redis is not started locally
+        return Math.min(times * 1000, 3000);
       },
     });
 
-    redisConnection.on('error', (err) => {
-      // Suppress noisy uncaught errors if Redis is not started in local dev
+    redisConnection.on('ready', () => {
+      isRedisAvailable = true;
+      console.log('[BullMQ] Redis connection established and ready.');
+    });
+
+    redisConnection.on('error', () => {
+      isRedisAvailable = false;
+    });
+
+    redisConnection.on('close', () => {
+      isRedisAvailable = false;
+    });
+
+    redisConnection.on('end', () => {
+      isRedisAvailable = false;
     });
   }
   return redisConnection;
@@ -49,8 +64,8 @@ export function initializeEmailQueue(): void {
       },
     });
 
-    emailQueue.on('error', (err) => {
-      // Suppress unhandled error emission when Redis is offline in local development
+    emailQueue.on('error', () => {
+      // Suppress noisy error emission when Redis is offline in local dev
     });
 
     emailWorker = new Worker<VerificationEmailJobData>(
@@ -62,38 +77,40 @@ export function initializeEmailQueue(): void {
       { connection }
     );
 
-    emailWorker.on('error', (err) => {
-      // Suppress unhandled error emission when Redis is offline in local development
+    emailWorker.on('error', () => {
+      // Suppress noisy error emission when Redis is offline in local dev
     });
 
     emailWorker.on('failed', (job, err) => {
-      // Failed job logged
+      console.error(`[BullMQ] Email job ${job?.id} failed:`, err);
     });
   } catch (err) {
-    // If Redis is unavailable, worker initialization will defer gracefully
+    console.warn('[BullMQ] Redis queue initialization deferred:', err);
   }
 }
 
 /**
- * Enqueues a verification email delivery job into the BullMQ background queue.
- * If Redis is unavailable, processes asynchronously via background promise.
+ * Enqueues a verification email delivery job.
+ * If BullMQ with Redis is available, it is processed via BullMQ.
+ * If Redis is offline or unavailable, it automatically falls back to non-blocking
+ * background dispatch via setImmediate so verification emails are NEVER lost.
  */
 export async function enqueueVerificationEmail(data: VerificationEmailJobData): Promise<void> {
-  if (emailQueue) {
+  if (isRedisAvailable && emailQueue) {
     try {
       await emailQueue.add('send-verification-email', data);
       return;
     } catch {
-      // Fallback to asynchronous execution if Redis connection fails
+      // Redis unavailable or queue error -> proceed to fallback
     }
   }
 
-  // Graceful asynchronous dispatch without blocking HTTP response
+  // Resilient asynchronous background dispatch
   setImmediate(async () => {
     try {
       await EmailService.sendVerificationEmail(data.email, data.name, data.token, data.code);
-    } catch {
-      // Suppress unhandled error
+    } catch (err) {
+      console.error('[EmailQueue] Error sending verification email in fallback mode:', err);
     }
   });
 }

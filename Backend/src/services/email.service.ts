@@ -124,25 +124,32 @@ ${code ? `Your 6-digit verification code is: ${code}\n\n` : ''}
 Or click the link below to verify directly:
 ${verificationUrl}
 
-This one-time verification link and code are valid for 24 hours.
+This one-time verification link and code are valid for 15 minutes.
 
 If you did not sign up for Rota, you can safely ignore this email.
     `.trim();
 
-    const info = await transporter.sendMail({
-      from: config.email.from,
-      to,
-      subject: 'Verify your Rota Account',
-      text: textContent,
-      html: htmlContent,
-    });
+    try {
+      const info = await transporter.sendMail({
+        from: config.email.from,
+        to,
+        subject: 'Verify your Rota Account',
+        text: textContent,
+        html: htmlContent,
+      });
 
-    const previewUrl = nodemailer.getTestMessageUrl(info);
+      console.log(`[EmailService] Verification email successfully sent to ${to} (Message ID: ${info.messageId})`);
 
-    return {
-      messageId: info.messageId,
-      previewUrl,
-    };
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+
+      return {
+        messageId: info.messageId,
+        previewUrl,
+      };
+    } catch (err: any) {
+      console.error(`[EmailService] Failed to send verification email to ${to}:`, err.message);
+      throw err;
+    }
   }
 }
 
