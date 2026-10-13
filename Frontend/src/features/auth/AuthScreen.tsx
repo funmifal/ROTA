@@ -42,13 +42,38 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     setGeneralError('');
   };
 
+  // Parse name into structured parts supporting 2, 3, and >3 words (compound/middle names)
+  const parseNameParts = (fullName: string) => {
+    const trimmed = fullName.trim();
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return { words, firstName: '', middleName: '', lastName: '' };
+    if (words.length === 1) return { words, firstName: words[0], middleName: '', lastName: '' };
+    if (words.length === 2) return { words, firstName: words[0], middleName: '', lastName: words[1] };
+    if (words.length === 3) return { words, firstName: words[0], middleName: words[1], lastName: words[2] };
+    // Edge case: more than 3 words (e.g. compound first, middle, or last names)
+    return {
+      words,
+      firstName: words[0],
+      middleName: words.slice(1, -1).join(' '),
+      lastName: words[words.length - 1],
+    };
+  };
+
   const handleNameBlur = () => {
-    if (!name.trim()) {
+    const trimmed = name.trim();
+    if (!trimmed) {
       setNameError('Full Name field cannot be empty');
-    } else if (/[^a-zA-Z\s]/.test(name)) {
+      return;
+    }
+    if (/[^a-zA-Z\s]/.test(name)) {
       setNameError('Name Must Use Only Letters');
-    } else if (name.trim().length < 2) {
-      setNameError('Name must be at least 2 characters');
+      return;
+    }
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    // Ensure at least 2 words are entered (first word + space + subsequent word)
+    if (words.length < 2) {
+      setNameError('Please enter at least 2 words (e.g. first and last name)');
+      return;
     }
   };
 
@@ -56,8 +81,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     setName(text);
     if (/[^a-zA-Z\s]/.test(text)) {
       setNameError('Name Must Use Only Letters');
-    } else if (nameError) {
-      setNameError('');
+    } else {
+      const words = text.trim().split(/\s+/).filter(Boolean);
+      if (nameError === 'Name Must Use Only Letters') {
+        setNameError('');
+      } else if (nameError === 'Please enter at least 2 words (e.g. first and last name)' && words.length >= 2) {
+        setNameError('');
+      } else if (nameError === 'Full Name field cannot be empty' && text.trim().length > 0) {
+        setNameError('');
+      }
     }
   };
 
@@ -86,15 +118,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
     // Validate Full Name for Sign Up
     if (!isLoginTab) {
-      if (!name.trim()) {
+      const trimmed = name.trim();
+      if (!trimmed) {
         setNameError('Full Name field cannot be empty');
         isValid = false;
       } else if (/[^a-zA-Z\s]/.test(name)) {
         setNameError('Name Must Use Only Letters');
         isValid = false;
-      } else if (name.trim().length < 2) {
-        setNameError('Name must be at least 2 characters');
-        isValid = false;
+      } else {
+        const words = trimmed.split(/\s+/).filter(Boolean);
+        if (words.length < 2) {
+          setNameError('Please enter at least 2 words (e.g. first and last name)');
+          isValid = false;
+        }
       }
     }
 
@@ -131,7 +167,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         const res = await api.login(email.trim(), password);
         onAuthSuccess(res.user);
       } else {
-        const res = await api.register(name.trim(), email.trim(), password);
+        const nameParts = parseNameParts(name);
+        const res = await api.register(name.trim(), email.trim(), password, {
+          firstName: nameParts.firstName,
+          middleName: nameParts.middleName || undefined,
+          lastName: nameParts.lastName,
+        });
         onAuthSuccess(res.user);
       }
     } catch (err: unknown) {

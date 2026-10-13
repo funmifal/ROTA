@@ -5,6 +5,9 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.100.7:50
 export interface User {
   id: string;
   name: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
   email: string;
   createdAt: string;
   emailVerifiedAt: string | null;
@@ -67,10 +70,20 @@ export const api = {
     return request('/health');
   },
 
-  async register(name: string, email: string, password: string): Promise<AuthResponse> {
+  async register(
+    name: string,
+    email: string,
+    password: string,
+    nameParts?: { firstName?: string; middleName?: string; lastName?: string }
+  ): Promise<AuthResponse> {
     const res = await request<AuthResponse>('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        ...(nameParts || {}),
+      }),
     });
     if (res.token) {
       await storage.saveToken(res.token);
