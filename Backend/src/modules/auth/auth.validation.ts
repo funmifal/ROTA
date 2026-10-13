@@ -23,6 +23,7 @@ export const registerSchema = z.object({
   password: z
     .string()
     .min(8, 'Minimum Of 8 Characters')
+    .max(64, 'Password must not exceed 64 characters')
     .refine((val) => /[a-z]/.test(val), { message: 'Password must contain a lowercase letter' })
     .refine((val) => /[A-Z]/.test(val), { message: 'Password must contain an uppercase letter' })
     .refine((val) => /[0-9]/.test(val), { message: 'Password must contain a number' })
@@ -31,7 +32,7 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
   email: z.string().trim().email('Invalid email address').toLowerCase(),
-  password: z.string().min(1, 'Password is required'),
+  password: z.string().min(1, 'Password is required').max(64, 'Password must not exceed 64 characters'),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

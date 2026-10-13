@@ -184,6 +184,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       return;
     }
     if (!isLoginTab) {
+      if (trimmed.length < 8) {
+        setPasswordError('Minimum Of 8 Characters');
+        setPasswordSuccess(false);
+        return;
+      }
+      if (trimmed.length > 64) {
+        setPasswordError('Password must not exceed 64 characters');
+        setPasswordSuccess(false);
+        return;
+      }
       if (!/[a-z]/.test(trimmed)) {
         setPasswordError('Password must contain a lowercase letter');
         setPasswordSuccess(false);
@@ -201,11 +211,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       }
       if (!/[#@>^\W_]/.test(trimmed)) {
         setPasswordError('Password must contain a special character(#@>^)');
-        setPasswordSuccess(false);
-        return;
-      }
-      if (trimmed.length < 8) {
-        setPasswordError('Minimum Of 8 Characters');
         setPasswordSuccess(false);
         return;
       }
@@ -248,12 +253,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       isValid = false;
     }
 
-    // Validate Password
+    // Validate Password (Length superior to composition: 8 min 64 max)
     if (!password) {
       setPasswordError('Password field cannot be empty');
       isValid = false;
     } else if (!isLoginTab) {
-      if (!/[a-z]/.test(password)) {
+      if (password.length < 8) {
+        setPasswordError('Minimum Of 8 Characters');
+        isValid = false;
+      } else if (password.length > 64) {
+        setPasswordError('Password must not exceed 64 characters');
+        isValid = false;
+      } else if (!/[a-z]/.test(password)) {
         setPasswordError('Password must contain a lowercase letter');
         isValid = false;
       } else if (!/[A-Z]/.test(password)) {
@@ -264,9 +275,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         isValid = false;
       } else if (!/[#@>^\W_]/.test(password)) {
         setPasswordError('Password must contain a special character(#@>^)');
-        isValid = false;
-      } else if (password.length < 8) {
-        setPasswordError('Minimum Of 8 Characters');
         isValid = false;
       }
     }
@@ -307,18 +315,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     : Boolean(name.trim() && email.trim() && password);
 
   // Real-time password requirement detection for Create Account
+  // Length is superior to composition (8 min 64 max)
   const passwordRequirements = {
+    hasMinLength: password.length >= 8,
+    isWithinMaxLength: password.length <= 64,
     hasLowercase: /[a-z]/.test(password),
     hasUppercase: /[A-Z]/.test(password),
     hasNumber: /[0-9]/.test(password),
     hasSpecialChar: /[#@>^\W_]/.test(password),
-    hasMinLength: password.length >= 8,
   };
 
-  // Hidden by default (when empty). As user types, displays each unmet requirement alone in real time,
-  // removing each as met, with the length requirement appearing last.
+  // Hidden by default (when empty). As user types, displays each unmet requirement alone in real time.
+  // Length is superior to composition (8 min 64 max):
+  // Length requirement is prioritized and evaluated first before composition.
   const getActivePasswordRequirement = (): string | null => {
     if (password.length === 0) return null;
+    if (!passwordRequirements.hasMinLength) {
+      return 'Minimum Of 8 Characters';
+    }
+    if (!passwordRequirements.isWithinMaxLength) {
+      return 'Password must not exceed 64 characters';
+    }
     if (!passwordRequirements.hasLowercase) {
       return 'Password must contain a lowercase letter';
     }
@@ -330,9 +347,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     }
     if (!passwordRequirements.hasSpecialChar) {
       return 'Password must contain a special character(#@>^)';
-    }
-    if (!passwordRequirements.hasMinLength) {
-      return 'Minimum Of 8 Characters';
     }
     return null;
   };
@@ -428,7 +442,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             isPassword
             onChangeText={handlePasswordChange}
             onBlur={handlePasswordBlur}
-            placeholder={isLoginTab ? 'Enter your password' : 'Min. 8 characters'}
+            placeholder={isLoginTab ? 'Enter your password' : '8 - 64 characters'}
+            maxLength={64}
             autoCapitalize="none"
             error={passwordError}
             success={passwordSuccess}
