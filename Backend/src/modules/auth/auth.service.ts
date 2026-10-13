@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../database/prisma';
 import { config } from '../../config/env';
 import { EmailService } from '../../services/email.service';
+import { enqueueVerificationEmail } from '../../queues/email.queue';
 import { generateSecureVerificationCode } from '../../utils/crypto.util';
 import { RegisterInput, LoginInput } from './auth.validation';
 
@@ -63,10 +64,13 @@ export class AuthService {
       },
     });
 
-    // Send one-time email verification link and code using Nodemailer
-    EmailService.sendVerificationEmail(user.email, user.name, verificationToken, verificationCode).catch(() => {
-      // Background retry / resend available
-    });
+    // Enqueue background job to send verification email with 6-digit code via BullMQ
+    enqueueVerificationEmail({
+      email: user.email,
+      name: user.name,
+      token: verificationToken,
+      code: verificationCode,
+    }).catch(() => {});
 
     const token = this.generateToken(user.id, user.email);
 
@@ -188,7 +192,12 @@ export class AuthService {
       },
     });
 
-    await EmailService.sendVerificationEmail(user.email, user.name, verificationToken, verificationCode);
+    await enqueueVerificationEmail({
+      email: user.email,
+      name: user.name,
+      token: verificationToken,
+      code: verificationCode,
+    });
 
     return { message: 'A new one-time verification link and code have been sent to your email.' };
   }

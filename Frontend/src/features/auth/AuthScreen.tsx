@@ -14,13 +14,19 @@ import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { FeedbackBanner } from '../../components/FeedbackBanner';
 import { api, User } from '../../services/api';
+import { VerifyEmailModal } from './VerifyEmailModal';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: User) => void;
+  initialTab?: 'login' | 'signup';
 }
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
-  const [isLoginTab, setIsLoginTab] = useState(true);
+export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialTab = 'signup' }) => {
+  const [isLoginTab, setIsLoginTab] = useState(initialTab === 'login');
+
+  // Verify email modal state
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [pendingUser, setPendingUser] = useState<User | null>(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -299,7 +305,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           middleName: nameParts.middleName || undefined,
           lastName: nameParts.lastName,
         });
-        onAuthSuccess(res.user);
+        setPendingUser(res.user);
+        setShowVerifyModal(true);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'An error occurred during authentication';
@@ -476,6 +483,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           />
         </View>
       </ScrollView>
+
+      {/* 6-Digit Email Verification Modal */}
+      <VerifyEmailModal
+        visible={showVerifyModal}
+        email={email.trim().toLowerCase()}
+        onSuccess={() => {
+          setShowVerifyModal(false);
+          if (pendingUser) {
+            onAuthSuccess(pendingUser);
+          }
+        }}
+        onClose={() => setShowVerifyModal(false)}
+      />
     </KeyboardAvoidingView>
   );
 };

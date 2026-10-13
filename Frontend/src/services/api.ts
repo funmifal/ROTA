@@ -122,4 +122,23 @@ export const api = {
   async getMe(): Promise<{ user: User }> {
     return request<{ user: User }>('/api/auth/me');
   },
+
+  async verifyCode(email: string, code: string): Promise<{ success: boolean; message: string; email: string }> {
+    return request<{ success: boolean; message: string; email: string }>('/api/auth/verify-code', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        code: code.trim(),
+      }),
+    });
+  },
+
+  async resendVerification(email: string): Promise<{ message: string }> {
+    return request<{ message: string }>('/api/auth/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+      }),
+    });
+  },
 };

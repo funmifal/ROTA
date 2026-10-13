@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { SafeAreaView, StyleSheet, StatusBar } from 'react-native';
 import { Colors } from './src/theme/tokens';
 import { SplashScreen } from './src/features/auth/SplashScreen';
+import { OnboardingScreen } from './src/features/auth/OnboardingScreen';
 import { AuthScreen } from './src/features/auth/AuthScreen';
 import { DashboardScreen } from './src/features/business/DashboardScreen';
 import { User } from './src/services/api';
 
-type AppState = 'splash' | 'auth' | 'dashboard';
+type AppState = 'splash' | 'onboarding' | 'auth' | 'dashboard';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('splash');
+  const [authTab, setAuthTab] = useState<'login' | 'signup'>('signup');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const handleSessionChecked = (user: User | null) => {
@@ -18,8 +20,19 @@ export default function App() {
       setAppState('dashboard');
     } else {
       setCurrentUser(null);
-      setAppState('auth');
+      // Open onboarding screens before create account / auth screen
+      setAppState('onboarding');
     }
+  };
+
+  const handleStartCreateAccount = () => {
+    setAuthTab('signup');
+    setAppState('auth');
+  };
+
+  const handleGoToLogin = () => {
+    setAuthTab('login');
+    setAppState('auth');
   };
 
   const handleAuthSuccess = (user: User) => {
@@ -29,6 +42,7 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setAuthTab('login');
     setAppState('auth');
   };
 
@@ -41,8 +55,17 @@ export default function App() {
       {appState === 'splash' && (
         <SplashScreen onSessionChecked={handleSessionChecked} />
       )}
+      {appState === 'onboarding' && (
+        <OnboardingScreen
+          onStartCreateAccount={handleStartCreateAccount}
+          onGoToLogin={handleGoToLogin}
+        />
+      )}
       {appState === 'auth' && (
-        <AuthScreen onAuthSuccess={handleAuthSuccess} />
+        <AuthScreen
+          initialTab={authTab}
+          onAuthSuccess={handleAuthSuccess}
+        />
       )}
       {appState === 'dashboard' && currentUser && (
         <DashboardScreen user={currentUser} onLogout={handleLogout} />

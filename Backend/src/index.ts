@@ -2,8 +2,12 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { config } from './config/env';
 import authRoutes from './modules/auth/auth.routes';
+import { initializeEmailQueue } from './queues/email.queue';
 
 const app = express();
+
+// Initialize BullMQ background email queue & worker
+initializeEmailQueue();
 
 // Middleware
 app.use(cors({
