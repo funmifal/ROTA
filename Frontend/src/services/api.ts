@@ -79,8 +79,8 @@ export const api = {
     const res = await request<AuthResponse>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify({
-        name,
-        email,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
         password,
         ...(nameParts || {}),
       }),
@@ -94,7 +94,10 @@ export const api = {
   async login(email: string, password: string): Promise<AuthResponse> {
     const res = await request<AuthResponse>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        password,
+      }),
     });
     if (res.token) {
       await storage.saveToken(res.token);

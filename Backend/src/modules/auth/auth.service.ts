@@ -25,8 +25,9 @@ export class AuthService {
   private static readonly TOKEN_EXPIRY = '7d';
 
   static async register(input: RegisterInput): Promise<AuthResponse> {
+    const normalizedEmail = input.email.trim().toLowerCase();
     const existing = await prisma.user.findUnique({
-      where: { email: input.email },
+      where: { email: normalizedEmail },
     });
 
     if (existing) {
@@ -37,8 +38,8 @@ export class AuthService {
 
     const user = await prisma.user.create({
       data: {
-        name: input.name,
-        email: input.email,
+        name: input.name.trim(),
+        email: normalizedEmail,
         passwordHash,
       },
       select: {
@@ -56,8 +57,9 @@ export class AuthService {
   }
 
   static async login(input: LoginInput): Promise<AuthResponse> {
+    const normalizedEmail = input.email.trim().toLowerCase();
     const user = await prisma.user.findUnique({
-      where: { email: input.email },
+      where: { email: normalizedEmail },
     });
 
     if (!user) {

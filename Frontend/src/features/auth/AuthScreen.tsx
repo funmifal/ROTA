@@ -146,17 +146,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   };
 
   const handleEmailBlur = () => {
-    // Trim empty spaces at the end
-    const trimmed = email.trim();
-    setEmail(trimmed);
+    // Trim empty spaces at the end and bounce down to lowercase to prevent casing conflicts
+    const normalized = email.trim().toLowerCase();
+    setEmail(normalized);
 
-    if (!trimmed) {
+    if (!normalized) {
       setEmailError('Email Address field cannot be empty');
       setEmailSuccess(false);
       return;
     }
     const emailRegex = /^[^\s@]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!emailRegex.test(trimmed)) {
+    if (!emailRegex.test(normalized)) {
       setEmailError('Enter A Valid Email Address');
       setEmailSuccess(false);
       return;
@@ -290,11 +290,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
 
     try {
       if (isLoginTab) {
-        const res = await api.login(email.trim(), password);
+        const res = await api.login(email.trim().toLowerCase(), password);
         onAuthSuccess(res.user);
       } else {
         const nameParts = parseNameParts(name);
-        const res = await api.register(name.trim(), email.trim(), password, {
+        const res = await api.register(name.trim(), email.trim().toLowerCase(), password, {
           firstName: nameParts.firstName,
           middleName: nameParts.middleName || undefined,
           lastName: nameParts.lastName,
