@@ -151,6 +151,79 @@ If you did not sign up for Rota, you can safely ignore this email.
       throw err;
     }
   }
+
+  /**
+   * Sends a team invitation email with direct acceptance link.
+   */
+  static async sendInvitationEmail(
+    to: string,
+    inviterName: string,
+    businessName: string,
+    role: string,
+    token: string
+  ): Promise<{ messageId: string }> {
+    const transporter = await this.getTransporter();
+    const inviteUrl = `${config.appUrl}/invite/${encodeURIComponent(token)}`;
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
+    .container { max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 32px; border: 1px solid #e2e8f0; }
+    .header { font-size: 24px; font-weight: 700; color: #2f6b5f; margin-bottom: 20px; }
+    .button { display: inline-block; background-color: #2f6b5f; color: #ffffff !important; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0; }
+    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Join ${escapeHtml(businessName)} on Rota</div>
+    <p>Hi there,</p>
+    <p><strong>${escapeHtml(inviterName)}</strong> has invited you to join the team at <strong>${escapeHtml(businessName)}</strong> as a <strong>${escapeHtml(role)}</strong> on Rota.</p>
+    <div style="text-align: center;">
+      <a href="${inviteUrl}" class="button">Accept Invitation</a>
+    </div>
+    <p style="font-size: 13px; color: #64748b;">Or copy and paste this link into your browser:</p>
+    <p style="font-size: 12px; color: #2f6b5f; word-break: break-all;">${inviteUrl}</p>
+    <p style="font-size: 12px; color: #64748b;">This invitation link will expire in 7 days.</p>
+    <div class="footer">
+      Rota Workforce Management • Simplifying shift schedules for teams.
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    const textContent = `
+Hi there,
+
+${inviterName} has invited you to join ${businessName} as a ${role} on Rota.
+
+Accept your invitation here:
+${inviteUrl}
+
+This invitation link expires in 7 days.
+    `.trim();
+
+    try {
+      const info = await transporter.sendMail({
+        from: config.email.from,
+        to,
+        subject: `You're invited to join ${businessName} on Rota`,
+        text: textContent,
+        html: htmlContent,
+      });
+
+      console.log(`[EmailService] Team invitation sent to ${to} for ${businessName} (Message ID: ${info.messageId})`);
+      return { messageId: info.messageId };
+    } catch (err: any) {
+      console.error(`[EmailService] Failed to send invitation email to ${to}:`, err.message);
+      throw err;
+    }
+  }
 }
 
 function escapeHtml(str: string): string {

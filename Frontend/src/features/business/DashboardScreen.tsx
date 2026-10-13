@@ -5,11 +5,15 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Effects } from '../../theme/tokens';
 import { Button } from '../../components/Button';
 import { FeedbackBanner } from '../../components/FeedbackBanner';
-import { api, User, DashboardSummary } from '../../services/api';
+import { api, User, Business, DashboardSummary } from '../../services/api';
+import { CreateBusinessModal } from './CreateBusinessModal';
+import { TeamScreen } from '../team/TeamScreen';
 
 interface DashboardScreenProps {
   user: User;
@@ -17,38 +21,39 @@ interface DashboardScreenProps {
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout }) => {
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [activeBusiness, setActiveBusiness] = useState<Business | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [loggingOut, setLoggingOut] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [showTeamScreen, setShowTeamScreen] = useState(false);
+
+  const fetchInitialData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const [bizRes, summaryRes] = await Promise.all([
+        api.getBusinesses(),
+        api.getDashboardSummary().catch(() => null),
+      ]);
+
+      setBusinesses(bizRes.businesses);
+      if (bizRes.businesses.length > 0) {
+        setActiveBusiness(bizRes.businesses[0]);
+      }
+      setSummary(summaryRes);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load dashboard data.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function fetchDashboard() {
-      try {
-        setLoading(true);
-        setError('');
-        const data = await api.getDashboardSummary();
-        if (isMounted) {
-          setSummary(data);
-        }
-      } catch (err: unknown) {
-        if (isMounted) {
-          const msg = err instanceof Error ? err.message : 'Failed to load dashboard overview';
-          setError(msg);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchDashboard();
-    return () => {
-      isMounted = false;
-    };
+    fetchInitialData();
   }, []);
 
   const handleLogout = async () => {
@@ -61,13 +66,32 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
     }
   };
 
+  const handleBusinessCreated = (newBiz: Business) => {
+    setCreateModalVisible(false);
+    setBusinesses((prev) => [newBiz, ...prev]);
+    setActiveBusiness(newBiz);
+  };
+
+  if (showTeamScreen && activeBusiness) {
+    return (
+      <TeamScreen
+        business={activeBusiness}
+        currentUserRole={activeBusiness.currentUserRole || 'STAFF'}
+        onBack={() => {
+          setShowTeamScreen(false);
+          fetchInitialData();
+        }}
+      />
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* App Bar / Header */}
       <View style={styles.appBar}>
         <View>
           <Text style={styles.appBarTitle}>Rota</Text>
-          <Text style={styles.appBarSubtitle}>Shift Management</Text>
+          <Text style={styles.appBarSubtitle}>Workforce & Shifts</Text>
         </View>
         <Button
           title="Log Out"
@@ -79,45 +103,137 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* User Card */}
+        {/* User Welcome Card */}
         <View style={styles.card}>
           <Text style={styles.welcomeText}>Welcome, {user.name}</Text>
           <Text style={styles.emailText}>{user.email}</Text>
-          <View style={styles.badgeContainer}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Active Member</Text>
-            </View>
-          </View>
         </View>
 
-        {error ? (
-          <FeedbackBanner type="error" message={error} />
-        ) : null}
+        {error ? <FeedbackBanner type="error" message={error} /> : null}
 
-        {/* Dashboard Overview */}
-        <Text style={styles.sectionTitle}>Overview</Text>
+        {/* Business Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Business Organization</Text>
+          <TouchableOpacity
+            style={styles.createBizHeaderButton}
+            onPress={() => setCreateModalVisible(true)}
+          >
+            <Ionicons name="add" size={18} color={Colors.primary} />
+            <Text style={styles.createBizHeaderText}>New Business</Text>
+          </TouchableOpacity>
+        </View>
 
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator color={Colors.primary} size="small" />
           </View>
-        ) : summary ? (
-          <View style={styles.overviewGrid}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {summary.overview.upcomingShiftsCount}
-              </Text>
-              <Text style={styles.statLabel}>Upcoming Shifts</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>
-                {summary.overview.pendingSwapsCount}
-              </Text>
-              <Text style={styles.statLabel}>Pending Swaps</Text>
-            </View>
+        ) : businesses.length === 0 ? (
+          <View style={styles.emptyBizCard}>
+            <Ionicons name="business-outline" size={44} color={Colors.neutral} />
+            <Text style={styles.emptyBizTitle}>No Business Created Yet</Text>
+            <Text style={styles.emptyBizSubtitle}>
+              Create your business to start building schedules, setting shifts, and inviting your team.
+            </Text>
+            <Button
+              title="Create Business"
+              onPress={() => setCreateModalVisible(true)}
+              variant="primary"
+              style={{ marginTop: Spacing.mediumSpacing }}
+            />
           </View>
-        ) : null}
+        ) : (
+          <View>
+            {activeBusiness && (
+              <View style={styles.businessActiveCard}>
+                <View style={styles.bizHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.bizName}>{activeBusiness.name}</Text>
+                    <Text style={styles.bizDetails}>
+                      {activeBusiness.industry || 'Business'} • {activeBusiness.timezone}
+                    </Text>
+                  </View>
+                  <View style={styles.roleBadge}>
+                    <Text style={styles.roleBadgeText}>
+                      {activeBusiness.currentUserRole || 'MEMBER'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.bizStatsRow}>
+                  <View style={styles.bizStatItem}>
+                    <Ionicons name="people-outline" size={16} color={Colors.neutral} />
+                    <Text style={styles.bizStatText}>
+                      {activeBusiness.memberCount ?? 1} Team Member{activeBusiness.memberCount === 1 ? '' : 's'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.bizActionRow}>
+                  <Button
+                    title="Manage Team & Invites"
+                    onPress={() => setShowTeamScreen(true)}
+                    variant="primary"
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </View>
+            )}
+
+            {businesses.length > 1 && (
+              <View style={styles.bizSwitcher}>
+                <Text style={styles.switcherLabel}>Switch Business:</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
+                  {businesses.map((biz) => (
+                    <TouchableOpacity
+                      key={biz.id}
+                      style={[
+                        styles.switcherChip,
+                        biz.id === activeBusiness?.id && styles.activeSwitcherChip,
+                      ]}
+                      onPress={() => setActiveBusiness(biz)}
+                    >
+                      <Text
+                        style={[
+                          styles.switcherChipText,
+                          biz.id === activeBusiness?.id && styles.activeSwitcherChipText,
+                        ]}
+                      >
+                        {biz.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Dashboard Overview */}
+        <Text style={[styles.sectionTitle, { marginTop: Spacing.largeSpacing }]}>
+          Schedule Overview
+        </Text>
+
+        <View style={styles.overviewGrid}>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>
+              {summary?.overview?.upcomingShiftsCount ?? 0}
+            </Text>
+            <Text style={styles.statLabel}>Upcoming Shifts</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>
+              {summary?.overview?.pendingSwapsCount ?? 0}
+            </Text>
+            <Text style={styles.statLabel}>Pending Swaps</Text>
+          </View>
+        </View>
       </ScrollView>
+
+      <CreateBusinessModal
+        visible={createModalVisible}
+        onSuccess={handleBusinessCreated}
+        onClose={() => setCreateModalVisible(false)}
+      />
     </View>
   );
 };
@@ -132,7 +248,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.baseSpacing,
-    paddingTop: Spacing.xLargeSpacing + 8,
+    paddingTop: Spacing.largeSpacing + 4,
     paddingBottom: Spacing.baseSpacing,
     backgroundColor: Colors.surfaceContainerLowest,
     borderBottomWidth: 1,
@@ -146,7 +262,6 @@ const styles = StyleSheet.create({
   },
   appBarSubtitle: {
     fontSize: Typography.bodySmall.fontSize,
-    lineHeight: Typography.bodySmall.lineHeight,
     color: Colors.neutral,
   },
   logoutButton: {
@@ -161,7 +276,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceContainerLowest,
     borderRadius: 12,
     padding: Spacing.largeSpacing,
-    marginBottom: Spacing.largeSpacing,
+    marginBottom: Spacing.baseSpacing,
     borderWidth: 1,
     borderColor: Colors.surfaceContainer,
     ...Effects.softShadow,
@@ -174,32 +289,134 @@ const styles = StyleSheet.create({
   },
   emailText: {
     fontSize: Typography.bodyMedium.fontSize,
-    lineHeight: Typography.bodyMedium.lineHeight,
     color: Colors.neutral,
     marginTop: 4,
   },
-  badgeContainer: {
+  sectionHeader: {
     flexDirection: 'row',
-    marginTop: Spacing.mediumSpacing,
-  },
-  badge: {
-    backgroundColor: Colors.primaryContainer,
-    paddingHorizontal: Spacing.mediumSpacing,
-    paddingVertical: 4,
-    borderRadius: 16,
-  },
-  badgeText: {
-    fontSize: Typography.labelSmall.fontSize,
-    lineHeight: Typography.labelSmall.lineHeight,
-    fontWeight: '600',
-    color: Colors.onPrimaryContainer,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.smallSpacing,
+    marginBottom: Spacing.mediumSpacing,
   },
   sectionTitle: {
     fontSize: Typography.titleMedium.fontSize,
     lineHeight: Typography.titleMedium.lineHeight,
     fontWeight: '600',
     color: Colors.onSurface,
-    marginBottom: Spacing.mediumSpacing,
+  },
+  createBizHeaderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  createBizHeaderText: {
+    fontSize: Typography.labelMedium.fontSize,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  emptyBizCard: {
+    backgroundColor: Colors.surfaceContainerLowest,
+    borderRadius: 12,
+    padding: Spacing.largeSpacing,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.surfaceContainer,
+    ...Effects.softShadow,
+  },
+  emptyBizTitle: {
+    fontSize: Typography.titleMedium.fontSize,
+    fontWeight: '600',
+    color: Colors.onSurface,
+    marginTop: Spacing.smallSpacing,
+    marginBottom: 4,
+  },
+  emptyBizSubtitle: {
+    fontSize: Typography.bodySmall.fontSize,
+    color: Colors.neutral,
+    textAlign: 'center',
+    maxWidth: 280,
+  },
+  businessActiveCard: {
+    backgroundColor: Colors.surfaceContainerLowest,
+    borderRadius: 12,
+    padding: Spacing.largeSpacing,
+    borderWidth: 1,
+    borderColor: Colors.surfaceContainer,
+    ...Effects.softShadow,
+  },
+  bizHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.smallSpacing,
+  },
+  bizName: {
+    fontSize: Typography.titleMedium.fontSize,
+    fontWeight: '700',
+    color: Colors.onSurface,
+  },
+  bizDetails: {
+    fontSize: Typography.bodySmall.fontSize,
+    color: Colors.neutral,
+    marginTop: 2,
+  },
+  roleBadge: {
+    backgroundColor: Colors.primaryContainer,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.onPrimaryContainer,
+  },
+  bizStatsRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginVertical: Spacing.smallSpacing,
+  },
+  bizStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  bizStatText: {
+    fontSize: Typography.bodySmall.fontSize,
+    color: Colors.neutral,
+  },
+  bizActionRow: {
+    marginTop: Spacing.baseSpacing,
+  },
+  bizSwitcher: {
+    marginTop: Spacing.mediumSpacing,
+  },
+  switcherLabel: {
+    fontSize: Typography.labelSmall.fontSize,
+    color: Colors.neutral,
+    fontWeight: '600',
+  },
+  switcherChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: Colors.surfaceContainerLow,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: Colors.neutralContainer,
+  },
+  activeSwitcherChip: {
+    backgroundColor: Colors.primaryContainer,
+    borderColor: Colors.primary,
+  },
+  switcherChipText: {
+    fontSize: 12,
+    color: Colors.neutral,
+  },
+  activeSwitcherChipText: {
+    color: Colors.onPrimaryContainer,
+    fontWeight: '600',
   },
   loadingContainer: {
     padding: Spacing.largeSpacing,
@@ -208,6 +425,7 @@ const styles = StyleSheet.create({
   overviewGrid: {
     flexDirection: 'row',
     gap: Spacing.mediumSpacing,
+    marginTop: Spacing.smallSpacing,
   },
   statCard: {
     flex: 1,

@@ -39,6 +39,15 @@ app.get('/health', (_req: Request, res: Response) => {
 // Auth module routes
 app.use('/api/auth', authRoutes);
 
+// Business and Team routes
+import businessRoutes from './modules/businesses/business.routes';
+import teamRoutes from './modules/team/team.routes';
+import invitationRoutes from './modules/team/invitation.routes';
+
+app.use('/api/businesses', businessRoutes);
+app.use('/api/businesses/:businessId', teamRoutes);
+app.use('/api/invitations', invitationRoutes);
+
 // Protected dashboard route (required by Checkpoint 2: "Add a protected route the dashboard can call.")
 import { requireAuth } from './middleware/auth';
 app.get('/api/dashboard/summary', requireAuth, (req: Request, res: Response) => {

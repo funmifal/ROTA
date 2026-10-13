@@ -141,4 +141,106 @@ export const api = {
       }),
     });
   },
+
+  // Business Management
+  async getBusinesses(): Promise<{ businesses: Business[] }> {
+    return request<{ businesses: Business[] }>('/api/businesses');
+  },
+
+  async createBusiness(data: { name: string; industry?: string; country?: string; timezone?: string }): Promise<{ message: string; business: Business }> {
+    return request<{ message: string; business: Business }>('/api/businesses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getBusiness(businessId: string): Promise<{ business: Business }> {
+    return request<{ business: Business }>(`/api/businesses/${businessId}`);
+  },
+
+  async updateBusiness(businessId: string, data: { name?: string; industry?: string; country?: string; timezone?: string }): Promise<{ message: string; business: Business }> {
+    return request<{ message: string; business: Business }>(`/api/businesses/${businessId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Team & Invitations
+  async getMembers(businessId: string): Promise<{ members: TeamMember[] }> {
+    return request<{ members: TeamMember[] }>(`/api/businesses/${businessId}/members`);
+  },
+
+  async inviteMember(businessId: string, data: { email: string; role: 'MANAGER' | 'STAFF' }): Promise<{ message: string; invitation: TeamInvitation; inviteUrl: string }> {
+    return request<{ message: string; invitation: TeamInvitation; inviteUrl: string }>(`/api/businesses/${businessId}/invitations`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getInvitations(businessId: string): Promise<{ invitations: TeamInvitation[] }> {
+    return request<{ invitations: TeamInvitation[] }>(`/api/businesses/${businessId}/invitations`);
+  },
+
+  async revokeInvitation(businessId: string, invitationId: string): Promise<{ message: string }> {
+    return request<{ message: string }>(`/api/businesses/${businessId}/invitations/${invitationId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async getInvitationByToken(token: string): Promise<{ invitation: any }> {
+    return request<{ invitation: any }>(`/api/invitations/${token}`);
+  },
+
+  async acceptInvitation(token: string): Promise<{ message: string; membership: any }> {
+    return request<{ message: string; membership: any }>(`/api/invitations/${token}/accept`, {
+      method: 'POST',
+    });
+  },
+
+  async updateMember(businessId: string, memberId: string, data: { role?: 'MANAGER' | 'STAFF'; status?: string }): Promise<{ message: string; member: any }> {
+    return request<{ message: string; member: any }>(`/api/businesses/${businessId}/members/${memberId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async removeMember(businessId: string, memberId: string): Promise<{ message: string }> {
+    return request<{ message: string }>(`/api/businesses/${businessId}/members/${memberId}`, {
+      method: 'DELETE',
+    });
+  },
 };
+
+export interface Business {
+  id: string;
+  name: string;
+  industry?: string;
+  country?: string;
+  timezone: string;
+  memberCount?: number;
+  currentUserRole?: 'OWNER' | 'MANAGER' | 'STAFF';
+  currentMembershipStatus?: 'ACTIVE' | 'INVITED' | 'SUSPENDED' | 'REMOVED';
+  departments?: { id: string; name: string }[];
+  locations?: { id: string; name: string }[];
+}
+
+export interface TeamMember {
+  membershipId: string;
+  userId: string;
+  name: string;
+  email: string;
+  role: 'OWNER' | 'MANAGER' | 'STAFF';
+  status: 'ACTIVE' | 'INVITED' | 'SUSPENDED' | 'REMOVED';
+  joinedAt: string;
+  emailVerified: boolean;
+}
+
+export interface TeamInvitation {
+  id: string;
+  email: string;
+  role: 'MANAGER' | 'STAFF';
+  expiresAt: string;
+  createdAt: string;
+  invitedBy?: string;
+  inviteUrl: string;
+}

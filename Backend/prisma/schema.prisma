@@ -7,14 +7,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum MembershipRole {
+  OWNER
+  MANAGER
+  STAFF
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 model User {
-  id              String    @id @default(cuid())
+  id              String          @id @default(cuid())
   name            String
-  email           String    @unique
+  email           String          @unique
   passwordHash    String
   emailVerifiedAt DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  memberships     Membership[]
+  sentInvitations Invitation[]    @relation("InvitedByUser")
+  auditLogs       AuditLog[]
 
   @@map("users")
 }
@@ -28,4 +52,104 @@ model EmailVerified {
   createdAt DateTime @default(now())
 
   @@map("EmailVerified")
+}
+
+model Business {
+  id          String        @id @default(cuid())
+  name        String
+  industry    String?
+  country     String?
+  timezone    String        @default("Africa/Lagos") // IANA timezone identifier
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  memberships Membership[]
+  invitations Invitation[]
+  departments Department[]
+  locations   Location[]
+  auditLogs   AuditLog[]
+
+  @@map("businesses")
+}
+
+model Membership {
+  id          String           @id @default(cuid())
+  businessId  String
+  userId      String
+  role        MembershipRole   @default(STAFF)
+  status      MembershipStatus @default(ACTIVE)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  business    Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, userId])
+  @@index([businessId, status])
+  @@index([userId, status])
+  @@map("memberships")
+}
+
+model Invitation {
+  id          String           @id @default(cuid())
+  businessId  String
+  email       String
+  role        MembershipRole   @default(STAFF)
+  token       String           @unique
+  status      InvitationStatus @default(PENDING)
+  invitedById String
+  expiresAt   DateTime
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  business    Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invitedBy   User             @relation("InvitedByUser", fields: [invitedById], references: [id])
+
+  @@index([businessId, email])
+  @@index([token, status])
+  @@map("invitations")
+}
+
+model Department {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, name])
+  @@map("departments")
+}
+
+model Location {
+  id         String   @id @default(cuid())
+  businessId String
+  name       String
+  address    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, name])
+  @@map("locations")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  businessId String
+  userId     String?
+  action     String
+  resource   String
+  resourceId String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt])
+  @@map("audit_logs")
 }
