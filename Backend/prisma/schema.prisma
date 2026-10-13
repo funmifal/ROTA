@@ -58,6 +58,20 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PlanTier {
+  STARTER
+  TEAM
+  BUSINESS
+}
+
+enum LedgerEntryType {
+  CHARGE
+  CREDIT
+  REFUND
+  CORRECTION
+}
+
+
 model User {
   id                  String               @id @default(cuid())
   name                String
@@ -115,13 +129,16 @@ model Business {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  memberships  Membership[]
-  invitations  Invitation[]
-  departments  Department[]
-  locations    Location[]
-  auditLogs    AuditLog[]
-  shifts       Shift[]
-  swapRequests SwapRequest[]
+  memberships    Membership[]
+  invitations    Invitation[]
+  departments    Department[]
+  locations      Location[]
+  auditLogs      AuditLog[]
+  shifts         Shift[]
+  swapRequests   SwapRequest[]
+  subscription   Subscription?
+  payments       Payment[]
+  billingLedgers BillingLedger[]
 
   @@map("businesses")
 }
@@ -323,3 +340,87 @@ model MagicLinkToken {
   @@index([email])
   @@map("magic_link_tokens")
 }
+
+model Subscription {
+  id                    String             @id @default(cuid())
+  businessId            String             @unique
+  plan                  PlanTier           @default(STARTER)
+  status                SubscriptionStatus @default(ACTIVE)
+  seatsIncluded         Int                @default(5)
+  extraSeats            Int                @default(0)
+  totalSeats            Int                @default(5)
+  currentPeriodStart    DateTime           @default(now())
+  currentPeriodEnd      DateTime
+  cancelAtPeriodEnd     Boolean            @default(false)
+  pendingDowngradePlan  PlanTier?
+  pendingDowngradeSeats Int?
+  gracePeriodEnd        DateTime?
+  lastPaymentRef        String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  business              Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  payments              Payment[]
+  billingLedgers        BillingLedger[]
+
+  @@index([businessId, status])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  businessId     String
+  subscriptionId String?
+  amountCents    Int
+  currency       String        @default("USD")
+  status         PaymentStatus @default(PENDING)
+  provider       String        @default("FLUTTERWAVE")
+  providerTxId   String?       @unique
+  txRef          String        @unique
+  idempotencyKey String?       @unique
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  business       Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, status])
+  @@map("payments")
+}
+
+model BillingLedger {
+  id                String          @id @default(cuid())
+  businessId        String
+  subscriptionId    String?
+  type              LedgerEntryType
+  amountCents       Int             // Amount in cents (e.g. 2000 for $20 charge, -1333 for credit)
+  balanceAfterCents Int             // Running balance
+  description       String
+  referenceId       String?         // Reference to Payment, Invoice, or prior Ledger row
+  idempotencyKey    String?         @unique
+  metadata          Json?
+  createdAt         DateTime        @default(now())
+
+  business          Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  subscription      Subscription?   @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([businessId, createdAt(sort: Desc)])
+  @@map("billing_ledgers")
+}
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  eventId     String    @unique
+  provider    String    @default("FLUTTERWAVE")
+  eventType   String
+  payload     Json
+  status      String    @default("PENDING") // PENDING, PROCESSED, FAILED
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([eventId, status])
+  @@map("webhook_events")
+}
+

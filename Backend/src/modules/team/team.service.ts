@@ -109,6 +109,36 @@ export class TeamService {
       throw new Error('An active invitation has already been sent to this email address.');
     }
 
+    // Enforce subscription seat limits on the server (BILL-002, Requirement 5)
+    // An owner on Starter (5 seats) cannot invite a sixth person
+    const activeMembersCount = await prisma.membership.count({
+      where: {
+        businessId,
+        status: MembershipStatus.ACTIVE,
+      },
+    });
+
+    const pendingInvitesCount = await prisma.invitation.count({
+      where: {
+        businessId,
+        status: InvitationStatus.PENDING,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    const currentSeatUsage = activeMembersCount + pendingInvitesCount;
+    const subscription = await prisma.subscription.findUnique({
+      where: { businessId },
+    });
+
+    const maxAllowedSeats = subscription ? subscription.totalSeats : 5; // Default starter plan is 5 seats
+    if (currentSeatUsage >= maxAllowedSeats) {
+      const planName = subscription?.plan || 'Starter';
+      throw new Error(
+        `Seat limit reached (${maxAllowedSeats} seats). An owner on ${planName} cannot invite additional members without upgrading or adding seats.`
+      );
+    }
+
     // Generate secure unique invitation token (7 days validity)
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
