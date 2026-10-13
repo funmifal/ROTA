@@ -330,6 +330,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     hasSpecialChar: /[#@>^\W_]/.test(password),
   };
 
+  const hasAnyUnmetRequirement =
+    !passwordRequirements.hasLowercase ||
+    !passwordRequirements.hasUppercase ||
+    !passwordRequirements.hasNumber ||
+    !passwordRequirements.hasSpecialChar ||
+    !passwordRequirements.hasMinLength;
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -425,95 +432,81 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             success={passwordSuccess}
           />
 
-          {/* Password Requirements Checklist (Create Account only) */}
-          {!isLoginTab && (
+          {/* Password Requirements Checklist (Create Account only: shows unmet requirements, with length requirement last) */}
+          {!isLoginTab && hasAnyUnmetRequirement && (
             <View style={styles.passwordRequirementsContainer}>
               <Text style={styles.requirementsHeader}>Password Requirements</Text>
 
-              <View style={styles.requirementRow}>
-                <Ionicons
-                  name={passwordRequirements.hasMinLength ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={14}
-                  color={passwordRequirements.hasMinLength ? Colors.success : Colors.neutral}
-                  style={styles.requirementIcon}
-                />
-                <Text
-                  style={[
-                    styles.requirementText,
-                    passwordRequirements.hasMinLength && styles.requirementMetText,
-                  ]}
-                >
-                  Minimum Of 8 Characters
-                </Text>
-              </View>
+              {!passwordRequirements.hasLowercase && (
+                <View style={styles.requirementRow}>
+                  <Ionicons
+                    name="ellipse-outline"
+                    size={12}
+                    color={Colors.neutral}
+                    style={styles.requirementIcon}
+                  />
+                  <Text style={styles.requirementText}>
+                    Password must contain a lowercase letter
+                  </Text>
+                </View>
+              )}
 
-              <View style={styles.requirementRow}>
-                <Ionicons
-                  name={passwordRequirements.hasLowercase ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={14}
-                  color={passwordRequirements.hasLowercase ? Colors.success : Colors.neutral}
-                  style={styles.requirementIcon}
-                />
-                <Text
-                  style={[
-                    styles.requirementText,
-                    passwordRequirements.hasLowercase && styles.requirementMetText,
-                  ]}
-                >
-                  Password must contain a lowercase letter
-                </Text>
-              </View>
+              {!passwordRequirements.hasUppercase && (
+                <View style={styles.requirementRow}>
+                  <Ionicons
+                    name="ellipse-outline"
+                    size={12}
+                    color={Colors.neutral}
+                    style={styles.requirementIcon}
+                  />
+                  <Text style={styles.requirementText}>
+                    Password must contain an uppercase letter
+                  </Text>
+                </View>
+              )}
 
-              <View style={styles.requirementRow}>
-                <Ionicons
-                  name={passwordRequirements.hasUppercase ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={14}
-                  color={passwordRequirements.hasUppercase ? Colors.success : Colors.neutral}
-                  style={styles.requirementIcon}
-                />
-                <Text
-                  style={[
-                    styles.requirementText,
-                    passwordRequirements.hasUppercase && styles.requirementMetText,
-                  ]}
-                >
-                  Password must contain an uppercase letter
-                </Text>
-              </View>
+              {!passwordRequirements.hasNumber && (
+                <View style={styles.requirementRow}>
+                  <Ionicons
+                    name="ellipse-outline"
+                    size={12}
+                    color={Colors.neutral}
+                    style={styles.requirementIcon}
+                  />
+                  <Text style={styles.requirementText}>
+                    Password must contain a number
+                  </Text>
+                </View>
+              )}
 
-              <View style={styles.requirementRow}>
-                <Ionicons
-                  name={passwordRequirements.hasNumber ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={14}
-                  color={passwordRequirements.hasNumber ? Colors.success : Colors.neutral}
-                  style={styles.requirementIcon}
-                />
-                <Text
-                  style={[
-                    styles.requirementText,
-                    passwordRequirements.hasNumber && styles.requirementMetText,
-                  ]}
-                >
-                  Password must contain a number
-                </Text>
-              </View>
+              {!passwordRequirements.hasSpecialChar && (
+                <View style={styles.requirementRow}>
+                  <Ionicons
+                    name="ellipse-outline"
+                    size={12}
+                    color={Colors.neutral}
+                    style={styles.requirementIcon}
+                  />
+                  <Text style={styles.requirementText}>
+                    {'Password must contain a special character(#@>^)'}
+                  </Text>
+                </View>
+              )}
 
-              <View style={styles.requirementRow}>
-                <Ionicons
-                  name={passwordRequirements.hasSpecialChar ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={14}
-                  color={passwordRequirements.hasSpecialChar ? Colors.success : Colors.neutral}
-                  style={styles.requirementIcon}
-                />
-                <Text
-                  style={[
-                    styles.requirementText,
-                    passwordRequirements.hasSpecialChar && styles.requirementMetText,
-                  ]}
-                >
-                  {'Password must contain a special character(#@>^)'}
-                </Text>
-              </View>
+              {/* Length requirement shown LAST and hidden the moment the user meets it */}
+              {!passwordRequirements.hasMinLength && (
+                <View style={styles.requirementRow}>
+                  <Ionicons
+                    name="ellipse-outline"
+                    size={12}
+                    color={Colors.neutral}
+                    style={styles.requirementIcon}
+                  />
+                  <Text style={styles.requirementText}>
+                    Minimum Of 8 Characters
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
