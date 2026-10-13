@@ -170,22 +170,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const handlePasswordChange = (text: string) => {
     setPassword(text);
     if (passwordSuccess) setPasswordSuccess(false);
-
-    if (passwordError) {
-      if (isLoginTab) {
-        setPasswordError('');
-      } else {
-        const allMet =
-          text.length >= 8 &&
-          /[a-z]/.test(text) &&
-          /[A-Z]/.test(text) &&
-          /[0-9]/.test(text) &&
-          /[#@>^\W_]/.test(text);
-        if (allMet) {
-          setPasswordError('');
-        }
-      }
-    }
+    if (passwordError) setPasswordError('');
   };
 
   const handlePasswordBlur = () => {
@@ -199,11 +184,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       return;
     }
     if (!isLoginTab) {
-      if (trimmed.length < 8) {
-        setPasswordError('Minimum Of 8 Characters');
-        setPasswordSuccess(false);
-        return;
-      }
       if (!/[a-z]/.test(trimmed)) {
         setPasswordError('Password must contain a lowercase letter');
         setPasswordSuccess(false);
@@ -221,6 +201,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       }
       if (!/[#@>^\W_]/.test(trimmed)) {
         setPasswordError('Password must contain a special character(#@>^)');
+        setPasswordSuccess(false);
+        return;
+      }
+      if (trimmed.length < 8) {
+        setPasswordError('Minimum Of 8 Characters');
         setPasswordSuccess(false);
         return;
       }
@@ -268,10 +253,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       setPasswordError('Password field cannot be empty');
       isValid = false;
     } else if (!isLoginTab) {
-      if (password.length < 8) {
-        setPasswordError('Minimum Of 8 Characters');
-        isValid = false;
-      } else if (!/[a-z]/.test(password)) {
+      if (!/[a-z]/.test(password)) {
         setPasswordError('Password must contain a lowercase letter');
         isValid = false;
       } else if (!/[A-Z]/.test(password)) {
@@ -282,6 +264,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         isValid = false;
       } else if (!/[#@>^\W_]/.test(password)) {
         setPasswordError('Password must contain a special character(#@>^)');
+        isValid = false;
+      } else if (password.length < 8) {
+        setPasswordError('Minimum Of 8 Characters');
         isValid = false;
       }
     }
@@ -321,21 +306,38 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     ? Boolean(email.trim() && password)
     : Boolean(name.trim() && email.trim() && password);
 
-  // Real-time password requirement checklist for Create Account
+  // Real-time password requirement detection for Create Account
   const passwordRequirements = {
-    hasMinLength: password.length >= 8,
     hasLowercase: /[a-z]/.test(password),
     hasUppercase: /[A-Z]/.test(password),
     hasNumber: /[0-9]/.test(password),
     hasSpecialChar: /[#@>^\W_]/.test(password),
+    hasMinLength: password.length >= 8,
   };
 
-  const hasAnyUnmetRequirement =
-    !passwordRequirements.hasLowercase ||
-    !passwordRequirements.hasUppercase ||
-    !passwordRequirements.hasNumber ||
-    !passwordRequirements.hasSpecialChar ||
-    !passwordRequirements.hasMinLength;
+  // Hidden by default (when empty). As user types, displays each unmet requirement alone in real time,
+  // removing each as met, with the length requirement appearing last.
+  const getActivePasswordRequirement = (): string | null => {
+    if (password.length === 0) return null;
+    if (!passwordRequirements.hasLowercase) {
+      return 'Password must contain a lowercase letter';
+    }
+    if (!passwordRequirements.hasUppercase) {
+      return 'Password must contain an uppercase letter';
+    }
+    if (!passwordRequirements.hasNumber) {
+      return 'Password must contain a number';
+    }
+    if (!passwordRequirements.hasSpecialChar) {
+      return 'Password must contain a special character(#@>^)';
+    }
+    if (!passwordRequirements.hasMinLength) {
+      return 'Minimum Of 8 Characters';
+    }
+    return null;
+  };
+
+  const activePasswordRequirement = getActivePasswordRequirement();
 
   return (
     <KeyboardAvoidingView
@@ -432,81 +434,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             success={passwordSuccess}
           />
 
-          {/* Password Requirements Checklist (Create Account only: shows unmet requirements, with length requirement last) */}
-          {!isLoginTab && hasAnyUnmetRequirement && (
+          {/* Password Requirement (Create Account only: hidden by default, displayed alone in real time as user types, length last) */}
+          {!isLoginTab && activePasswordRequirement && (
             <View style={styles.passwordRequirementsContainer}>
-              <Text style={styles.requirementsHeader}>Password Requirements</Text>
-
-              {!passwordRequirements.hasLowercase && (
-                <View style={styles.requirementRow}>
-                  <Ionicons
-                    name="ellipse-outline"
-                    size={12}
-                    color={Colors.neutral}
-                    style={styles.requirementIcon}
-                  />
-                  <Text style={styles.requirementText}>
-                    Password must contain a lowercase letter
-                  </Text>
-                </View>
-              )}
-
-              {!passwordRequirements.hasUppercase && (
-                <View style={styles.requirementRow}>
-                  <Ionicons
-                    name="ellipse-outline"
-                    size={12}
-                    color={Colors.neutral}
-                    style={styles.requirementIcon}
-                  />
-                  <Text style={styles.requirementText}>
-                    Password must contain an uppercase letter
-                  </Text>
-                </View>
-              )}
-
-              {!passwordRequirements.hasNumber && (
-                <View style={styles.requirementRow}>
-                  <Ionicons
-                    name="ellipse-outline"
-                    size={12}
-                    color={Colors.neutral}
-                    style={styles.requirementIcon}
-                  />
-                  <Text style={styles.requirementText}>
-                    Password must contain a number
-                  </Text>
-                </View>
-              )}
-
-              {!passwordRequirements.hasSpecialChar && (
-                <View style={styles.requirementRow}>
-                  <Ionicons
-                    name="ellipse-outline"
-                    size={12}
-                    color={Colors.neutral}
-                    style={styles.requirementIcon}
-                  />
-                  <Text style={styles.requirementText}>
-                    {'Password must contain a special character(#@>^)'}
-                  </Text>
-                </View>
-              )}
-
-              {/* Length requirement shown LAST and hidden the moment the user meets it */}
-              {!passwordRequirements.hasMinLength && (
-                <View style={styles.requirementRow}>
-                  <Ionicons
-                    name="ellipse-outline"
-                    size={12}
-                    color={Colors.neutral}
-                    style={styles.requirementIcon}
-                  />
-                  <Text style={styles.requirementText}>
-                    Minimum Of 8 Characters
-                  </Text>
-                </View>
-              )}
+              <View style={styles.requirementRow}>
+                <Ionicons
+                  name="ellipse-outline"
+                  size={12}
+                  color={Colors.neutral}
+                  style={styles.requirementIcon}
+                />
+                <Text style={styles.requirementText}>
+                  {activePasswordRequirement}
+                </Text>
+              </View>
             </View>
           )}
 
@@ -614,7 +555,6 @@ const styles = StyleSheet.create({
   requirementRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
   },
   requirementIcon: {
     marginRight: 6,
