@@ -13,12 +13,14 @@ import { Colors, Typography, Spacing } from '../theme/tokens';
 interface InputProps extends TextInputProps {
   label: string;
   error?: string;
+  success?: boolean;
   containerStyle?: ViewStyle;
 }
 
 export const Input: React.FC<InputProps> = ({
   label,
   error,
+  success,
   containerStyle,
   style,
   onFocus,
@@ -34,6 +36,7 @@ export const Input: React.FC<InputProps> = ({
         style={[
           styles.input,
           isFocused ? styles.inputFocused : null,
+          success && !error ? styles.inputSuccess : null,
           error ? styles.inputError : null,
           style,
         ]}
@@ -84,6 +87,10 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: Colors.primary,
+  },
+  inputSuccess: {
+    backgroundColor: Colors.surfaceContainerLow,
+    borderColor: Colors.secondary,
   },
   inputError: {
     borderColor: Colors.error,

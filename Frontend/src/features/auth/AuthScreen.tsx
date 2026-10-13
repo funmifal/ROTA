@@ -31,6 +31,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
+  // Field success states
+  const [nameSuccess, setNameSuccess] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
   // General state
   const [generalError, setGeneralError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,6 +45,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     setEmailError('');
     setPasswordError('');
     setGeneralError('');
+    setNameSuccess(false);
+    setEmailSuccess(false);
+    setPasswordSuccess(false);
   };
 
   // Parse name into structured parts supporting 2, 3, and >3 words (compound/middle names)
@@ -60,25 +68,37 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   };
 
   const handleNameBlur = () => {
-    const trimmed = name.trim();
-    if (!trimmed) {
+    // Trim empty spaces at the end
+    const trimmed = name.trimEnd();
+    setName(trimmed);
+
+    if (!trimmed.trim()) {
       setNameError('Full Name field cannot be empty');
+      setNameSuccess(false);
       return;
     }
-    if (/[^a-zA-Z\s]/.test(name)) {
+    if (/[^a-zA-Z\s]/.test(trimmed)) {
       setNameError('Name Must Use Only Letters');
+      setNameSuccess(false);
       return;
     }
-    const words = trimmed.split(/\s+/).filter(Boolean);
+    const words = trimmed.trim().split(/\s+/).filter(Boolean);
     // Ensure at least 2 words are entered (first word + space + subsequent word)
     if (words.length < 2) {
       setNameError('Please enter at least 2 words (e.g. first and last name)');
+      setNameSuccess(false);
       return;
     }
+
+    // Success state
+    setNameError('');
+    setNameSuccess(true);
   };
 
   const handleNameChange = (text: string) => {
     setName(text);
+    if (nameSuccess) setNameSuccess(false);
+
     if (/[^a-zA-Z\s]/.test(text)) {
       setNameError('Name Must Use Only Letters');
     } else {
@@ -97,19 +117,51 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     const key = e.nativeEvent?.key;
     if (key && key.length === 1 && /[^a-zA-Z\s]/.test(key)) {
       setNameError('Name Must Use Only Letters');
+      setNameSuccess(false);
     }
   };
 
   const handleEmailBlur = () => {
-    if (!email.trim()) {
+    // Trim empty spaces at the end
+    const trimmed = email.trim();
+    setEmail(trimmed);
+
+    if (!trimmed) {
       setEmailError('Email Address field cannot be empty');
+      setEmailSuccess(false);
+      return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmed)) {
+      setEmailError('Please enter a valid email address');
+      setEmailSuccess(false);
+      return;
+    }
+
+    // Success state
+    setEmailError('');
+    setEmailSuccess(true);
   };
 
   const handlePasswordBlur = () => {
-    if (!password) {
+    // Trim empty spaces at the end
+    const trimmed = password.trimEnd();
+    setPassword(trimmed);
+
+    if (!trimmed) {
       setPasswordError('Password field cannot be empty');
+      setPasswordSuccess(false);
+      return;
     }
+    if (!isLoginTab && trimmed.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+      setPasswordSuccess(false);
+      return;
+    }
+
+    // Success state
+    setPasswordError('');
+    setPasswordSuccess(true);
   };
 
   const validate = (): boolean => {
@@ -247,6 +299,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
               placeholder="e.g. Sarah Connor"
               autoCapitalize="words"
               error={nameError}
+              success={nameSuccess}
             />
           )}
 
@@ -257,6 +310,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             onChangeText={(text) => {
               setEmail(text);
               if (emailError) setEmailError('');
+              if (emailSuccess) setEmailSuccess(false);
             }}
             onBlur={handleEmailBlur}
             placeholder="name@business.com"
@@ -264,6 +318,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             autoCapitalize="none"
             autoCorrect={false}
             error={emailError}
+            success={emailSuccess}
           />
 
           {/* Password Input */}
@@ -273,12 +328,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             onChangeText={(text) => {
               setPassword(text);
               if (passwordError) setPasswordError('');
+              if (passwordSuccess) setPasswordSuccess(false);
             }}
             onBlur={handlePasswordBlur}
             placeholder={isLoginTab ? 'Enter your password' : 'Min. 8 characters'}
             secureTextEntry
             autoCapitalize="none"
             error={passwordError}
+            success={passwordSuccess}
           />
 
           {/* Submit Button */}
