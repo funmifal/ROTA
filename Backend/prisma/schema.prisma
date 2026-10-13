@@ -59,18 +59,21 @@ enum PaymentStatus {
 }
 
 model User {
-  id              String          @id @default(cuid())
-  name            String
-  email           String          @unique
-  passwordHash    String
-  emailVerifiedAt DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id                  String               @id @default(cuid())
+  name                String
+  email               String               @unique
+  passwordHash        String
+  emailVerifiedAt     DateTime?
+  tokenVersion        Int                  @default(0)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 
-  memberships     Membership[]
-  sentInvitations Invitation[]    @relation("InvitedByUser")
-  auditLogs       AuditLog[]
-  settings        UserSettings?
+  memberships         Membership[]
+  sentInvitations     Invitation[]         @relation("InvitedByUser")
+  auditLogs           AuditLog[]
+  settings            UserSettings?
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -262,18 +265,61 @@ model SwapRequest {
 }
 
 model AuditLog {
-  id         String   @id @default(cuid())
-  businessId String
+  id         String    @id @default(cuid())
+  businessId String?
   userId     String?
   action     String
   resource   String
   resourceId String?
   metadata   Json?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([businessId, createdAt(sort: Desc), id(sort: Desc)], name: "idx_audit_logs_cursor")
   @@map("audit_logs")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  familyId  String    // Groups rotated tokens to detect replay/theft attacks
+  isRevoked Boolean   @default(false)
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRevoked])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model MagicLinkToken {
+  id        String    @id @default(cuid())
+  email     String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@map("magic_link_tokens")
 }

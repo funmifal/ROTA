@@ -95,6 +95,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
     return (
       <SettingsScreen
         onBack={() => setShowSettingsScreen(false)}
+        onLogoutAll={handleLogout}
       />
     );
   }

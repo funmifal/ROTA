@@ -224,6 +224,156 @@ This invitation link expires in 7 days.
       throw err;
     }
   }
+
+  /**
+   * Sends a password reset email with single-use, expiring token link.
+   */
+  static async sendPasswordResetEmail(
+    to: string,
+    name: string,
+    token: string
+  ): Promise<{ messageId: string }> {
+    const transporter = await this.getTransporter();
+    const resetUrl = `${config.appUrl}/reset-password?token=${encodeURIComponent(token)}`;
+    const deepLinkUrl = `rota://reset-password?token=${encodeURIComponent(token)}`;
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
+    .container { max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 32px; border: 1px solid #e2e8f0; }
+    .header { font-size: 24px; font-weight: 700; color: #006a60; margin-bottom: 20px; }
+    .button { display: inline-block; background-color: #006a60; color: #ffffff !important; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0; }
+    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px; }
+    .note { font-size: 13px; color: #b45309; background-color: #fffbeb; padding: 12px; border-radius: 6px; margin: 16px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Reset Your Rota Password</div>
+    <p>Hi ${escapeHtml(name)},</p>
+    <p>We received a request to reset your password for your Rota account. Click the button below to choose a new password:</p>
+    <div style="text-align: center;">
+      <a href="${resetUrl}" class="button">Reset Password</a>
+    </div>
+    <div class="note">
+      This password reset link is <strong>single-use</strong> and expires in <strong>1 hour</strong>.
+    </div>
+    <p style="font-size: 13px; color: #64748b;">If you are on your mobile phone with Rota installed, you can also use this app link:<br>
+      <a href="${deepLinkUrl}" style="color: #006a60;">Open in Rota App</a>
+    </p>
+    <div class="footer">
+      If you did not request a password reset, you can safely ignore this email. Your password will remain unchanged.
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    const textContent = `
+Hi ${name},
+
+We received a request to reset your password for your Rota account.
+Reset your password here:
+${resetUrl}
+
+This link is single-use and expires in 1 hour.
+
+If you did not request this, please ignore this email.
+    `.trim();
+
+    try {
+      const info = await transporter.sendMail({
+        from: config.email.from,
+        to,
+        subject: 'Reset your Rota Password',
+        text: textContent,
+        html: htmlContent,
+      });
+
+      console.log(`[EmailService] Password reset email sent to ${to} (Message ID: ${info.messageId})`);
+      return { messageId: info.messageId };
+    } catch (err: any) {
+      console.error(`[EmailService] Failed to send password reset email to ${to}:`, err.message);
+      throw err;
+    }
+  }
+
+  /**
+   * Sends a magic login link for passwordless authentication.
+   */
+  static async sendMagicLinkEmail(
+    to: string,
+    token: string
+  ): Promise<{ messageId: string }> {
+    const transporter = await this.getTransporter();
+    const magicUrl = `${config.appUrl}/magic-login?token=${encodeURIComponent(token)}`;
+    const deepLinkUrl = `rota://magic-login?token=${encodeURIComponent(token)}`;
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
+    .container { max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 32px; border: 1px solid #e2e8f0; }
+    .header { font-size: 24px; font-weight: 700; color: #006a60; margin-bottom: 20px; }
+    .button { display: inline-block; background-color: #006a60; color: #ffffff !important; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0; }
+    .footer { margin-top: 28px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px; }
+    .note { font-size: 13px; color: #0369a1; background-color: #f0f9ff; padding: 12px; border-radius: 6px; margin: 16px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Log In to Rota</div>
+    <p>Hi there,</p>
+    <p>Click the button below to securely log in to your Rota account without a password:</p>
+    <div style="text-align: center;">
+      <a href="${magicUrl}" class="button">Log In Instantly</a>
+    </div>
+    <div class="note">
+      This magic link is <strong>single-use</strong> and expires in <strong>15 minutes</strong>.
+    </div>
+    <p style="font-size: 13px; color: #64748b;">If you are on your mobile phone, open the app directly:<br>
+      <a href="${deepLinkUrl}" style="color: #006a60;">Open in Rota App</a>
+    </p>
+    <div class="footer">
+      If you did not request this login link, you can safely ignore this email.
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    const textContent = `
+Hi there,
+
+Click this link to log in to Rota:
+${magicUrl}
+
+This link is single-use and expires in 15 minutes.
+    `.trim();
+
+    try {
+      const info = await transporter.sendMail({
+        from: config.email.from,
+        to,
+        subject: 'Your Magic Login Link for Rota',
+        text: textContent,
+        html: htmlContent,
+      });
+
+      console.log(`[EmailService] Magic link email sent to ${to} (Message ID: ${info.messageId})`);
+      return { messageId: info.messageId };
+    } catch (err: any) {
+      console.error(`[EmailService] Failed to send magic link email to ${to}:`, err.message);
+      throw err;
+    }
+  }
 }
 
 function escapeHtml(str: string): string {

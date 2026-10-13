@@ -115,6 +115,29 @@ export class TeamController {
     }
   }
 
+  static async signUpWithInvitation(req: Request, res: Response): Promise<void> {
+    try {
+      const { token } = req.params;
+      const { name, password } = req.body;
+
+      if (!name || !password) {
+        res.status(400).json({ error: 'ValidationError', message: 'Name and password are required.' });
+        return;
+      }
+
+      const result = await TeamService.signUpWithInvitation(token, { name, password });
+      res.status(201).json({
+        message: `Welcome to ${result.business.name}! Your account has been created and joined to the team.`,
+        ...result,
+      });
+    } catch (err: any) {
+      res.status(400).json({
+        error: 'BadRequest',
+        message: err.message || 'Failed to complete sign-up with invitation.',
+      });
+    }
+  }
+
   static async updateMember(req: Request, res: Response): Promise<void> {
     try {
       if (!req.user) {

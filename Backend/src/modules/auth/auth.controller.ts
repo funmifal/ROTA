@@ -52,11 +52,151 @@ export class AuthController {
     }
   }
 
+  /**
+   * Refreshes access token with rotation and reuse detection.
+   */
+  static async refresh(req: Request, res: Response): Promise<void> {
+    try {
+      const { refreshToken } = req.body;
+      if (!refreshToken || typeof refreshToken !== 'string') {
+        res.status(400).json({
+          error: 'ValidationError',
+          message: 'Refresh token is required in request body.',
+        });
+        return;
+      }
+
+      const result = await AuthService.refreshTokens(refreshToken);
+      res.status(200).json(result);
+    } catch (error: any) {
+      const message = error.message || 'Token refresh failed.';
+      const statusCode = message.includes('reuse detected') ? 401 : 401;
+      res.status(statusCode).json({
+        error: 'TokenRefreshError',
+        message,
+      });
+    }
+  }
+
+  /**
+   * Single-device logout: Revokes the passed refresh token.
+   */
   static async logout(req: Request, res: Response): Promise<void> {
-    // In JWT architecture, client drops token; endpoint confirms session termination safely
-    res.status(200).json({
-      message: 'Logged out successfully.',
-    });
+    try {
+      const refreshToken = req.body?.refreshToken;
+      const result = await AuthService.logout(refreshToken);
+      res.status(200).json(result);
+    } catch (error: any) {
+      res.status(500).json({
+        error: 'LogoutError',
+        message: error.message || 'Failed to logout.',
+      });
+    }
+  }
+
+  /**
+   * Logs out of all devices:
+   * Revokes all active refresh tokens and increments user tokenVersion.
+   */
+  static async logoutAll(req: Request, res: Response): Promise<void> {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: 'Unauthorized', message: 'Not authenticated.' });
+        return;
+      }
+
+      const result = await AuthService.logoutAll(req.user.id);
+      res.status(200).json(result);
+    } catch (error: any) {
+      res.status(500).json({
+        error: 'LogoutError',
+        message: error.message || 'Failed to log out of all devices.',
+      });
+    }
+  }
+
+  /**
+   * Requests a passwordless magic login link.
+   */
+  static async requestMagicLink(req: Request, res: Response): Promise<void> {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== 'string') {
+        res.status(400).json({ error: 'ValidationError', message: 'Valid email address is required.' });
+        return;
+      }
+
+      const result = await AuthService.requestMagicLink(email);
+      res.status(200).json(result);
+    } catch (error: any) {
+      res.status(500).json({
+        error: 'MagicLinkError',
+        message: error.message || 'Failed to process magic link request.',
+      });
+    }
+  }
+
+  /**
+   * Verifies a magic login link token.
+   */
+  static async verifyMagicLink(req: Request, res: Response): Promise<void> {
+    try {
+      const { token } = req.body;
+      if (!token || typeof token !== 'string') {
+        res.status(400).json({ error: 'ValidationError', message: 'Magic link token is required.' });
+        return;
+      }
+
+      const result = await AuthService.verifyMagicLink(token);
+      res.status(200).json(result);
+    } catch (error: any) {
+      res.status(400).json({
+        error: 'MagicLinkError',
+        message: error.message || 'Invalid or expired magic link.',
+      });
+    }
+  }
+
+  /**
+   * Requests a password reset email with single-use token.
+   */
+  static async forgotPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== 'string') {
+        res.status(400).json({ error: 'ValidationError', message: 'Valid email address is required.' });
+        return;
+      }
+
+      const result = await AuthService.forgotPassword(email);
+      res.status(200).json(result);
+    } catch (error: any) {
+      res.status(500).json({
+        error: 'ForgotPasswordError',
+        message: error.message || 'Failed to process password reset request.',
+      });
+    }
+  }
+
+  /**
+   * Resets password using single-use expiring token.
+   */
+  static async resetPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const { token, newPassword } = req.body;
+      if (!token || !newPassword) {
+        res.status(400).json({ error: 'ValidationError', message: 'Token and newPassword are required.' });
+        return;
+      }
+
+      const result = await AuthService.resetPassword(token, newPassword);
+      res.status(200).json(result);
+    } catch (error: any) {
+      res.status(400).json({
+        error: 'PasswordResetError',
+        message: error.message || 'Password reset failed.',
+      });
+    }
   }
 
   static async getMe(req: Request, res: Response): Promise<void> {
@@ -86,7 +226,6 @@ export class AuthController {
 
       const result = await AuthService.verifyEmail(token);
 
-      // If requested by a web browser, render a clean branded confirmation page
       if (req.accepts('html')) {
         res.status(200).send(`
 <!DOCTYPE html>
@@ -192,4 +331,3 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
-

@@ -15,7 +15,9 @@ export interface User {
 
 export interface AuthResponse {
   user: User;
-  token: string;
+  token?: string;
+  accessToken?: string;
+  refreshToken?: string;
 }
 
 export interface DashboardSummary {
@@ -31,8 +33,8 @@ export interface DashboardSummary {
   };
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = await storage.getToken();
+async function request<T>(endpoint: string, options: RequestInit = {}, isRetry = false): Promise<T> {
+  const token = await storage.getAccessToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -53,6 +55,37 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     });
   } catch (netErr) {
     throw new Error(`Cannot connect to Rota server at ${API_BASE_URL}. Ensure server is running and device is on the same network.`);
+  }
+
+  // Self-study requirement: automatic refresh token rotation when short-lived access token expires
+  if (
+    response.status === 401 &&
+    !isRetry &&
+    !endpoint.includes('/api/auth/login') &&
+    !endpoint.includes('/api/auth/register') &&
+    !endpoint.includes('/api/auth/refresh')
+  ) {
+    const refreshToken = await storage.getRefreshToken();
+    if (refreshToken) {
+      try {
+        const refreshRes = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          await storage.saveTokens(refreshData.accessToken, refreshData.refreshToken);
+          return request<T>(endpoint, options, true); // Retry with rotated access token
+        } else {
+          // If refresh token was already used (stolen token detection) or expired, clear storage
+          await storage.clearTokens();
+        }
+      } catch {
+        await storage.clearTokens();
+      }
+    }
   }
 
   const data = await response.json().catch(() => null);
@@ -85,8 +118,9 @@ export const api = {
         ...(nameParts || {}),
       }),
     });
-    if (res.token) {
-      await storage.saveToken(res.token);
+    const tokenToSave = res.accessToken || res.token;
+    if (tokenToSave) {
+      await storage.saveTokens(tokenToSave, res.refreshToken);
     }
     return res;
   },
@@ -99,20 +133,70 @@ export const api = {
         password,
       }),
     });
-    if (res.token) {
-      await storage.saveToken(res.token);
+    const tokenToSave = res.accessToken || res.token;
+    if (tokenToSave) {
+      await storage.saveTokens(tokenToSave, res.refreshToken);
     }
     return res;
   },
 
   async logout(): Promise<void> {
     try {
-      await request('/api/auth/logout', { method: 'POST' });
+      const refreshToken = await storage.getRefreshToken();
+      await request('/api/auth/logout', {
+        method: 'POST',
+        body: JSON.stringify({ refreshToken }),
+      });
     } catch {
-      // safe to proceed even if offline
+      // safe to proceed
     } finally {
-      await storage.deleteToken();
+      await storage.clearTokens();
     }
+  },
+
+  async logoutAll(): Promise<{ message: string }> {
+    try {
+      return await request<{ message: string }>('/api/auth/logout-all', {
+        method: 'POST',
+      });
+    } finally {
+      await storage.clearTokens();
+    }
+  },
+
+  // Passwordless Magic Link
+  async requestMagicLink(email: string): Promise<{ message: string }> {
+    return request<{ message: string }>('/api/auth/magic-link', {
+      method: 'POST',
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    });
+  },
+
+  async verifyMagicLink(token: string): Promise<AuthResponse> {
+    const res = await request<AuthResponse>('/api/auth/magic-link/verify', {
+      method: 'POST',
+      body: JSON.stringify({ token: token.trim() }),
+    });
+    const tokenToSave = res.accessToken || res.token;
+    if (tokenToSave) {
+      await storage.saveTokens(tokenToSave, res.refreshToken);
+    }
+    return res;
+  },
+
+  // Password Reset (Single-use, expiring token)
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    return request<{ message: string }>('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    });
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    return request<{ message: string }>('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token: token.trim(), newPassword }),
+    });
   },
 
   async getDashboardSummary(): Promise<DashboardSummary> {
@@ -195,6 +279,18 @@ export const api = {
     return request<{ message: string; membership: any }>(`/api/invitations/${token}/accept`, {
       method: 'POST',
     });
+  },
+
+  async signUpWithInvitation(token: string, data: { name: string; password: string }): Promise<AuthResponse & { business: Business; membership: any }> {
+    const res = await request<AuthResponse & { business: Business; membership: any }>(`/api/invitations/${token}/signup`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    const tokenToSave = res.accessToken || res.token;
+    if (tokenToSave) {
+      await storage.saveTokens(tokenToSave, res.refreshToken);
+    }
+    return res;
   },
 
   async updateMember(businessId: string, memberId: string, data: { role?: 'MANAGER' | 'STAFF'; status?: string }): Promise<{ message: string; member: any }> {

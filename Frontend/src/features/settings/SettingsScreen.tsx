@@ -10,23 +10,45 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Effects } from '../../theme/tokens';
+import { Button } from '../../components/Button';
 import { FeedbackBanner } from '../../components/FeedbackBanner';
+import { api } from '../../services/api';
 import { useUserSettings, useUpdateUserSettings } from './useSettingsQuery';
 import { useAppStore } from '../../state/useAppStore';
 
 interface SettingsScreenProps {
   onBack: () => void;
+  onLogoutAll?: () => void;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onLogoutAll }) => {
   const { data: settings, isLoading, isError, error, refetch, isFetching } = useUserSettings();
   const { mutate: updateSettings, isPending: isUpdating } = useUpdateUserSettings();
+  const [loggingOutAll, setLoggingOutAll] = React.useState(false);
 
   const shouldSimulateSettingsFailure = useAppStore((s) => s.shouldSimulateSettingsFailure);
   const setShouldSimulateSettingsFailure = useAppStore((s) => s.setShouldSimulateSettingsFailure);
+  const showToast = useAppStore((s) => s.showToast);
 
   const handleToggle = (key: string, value: boolean) => {
     updateSettings({ [key]: value });
+  };
+
+  const handleLogoutAllDevices = async () => {
+    try {
+      setLoggingOutAll(true);
+      await api.logoutAll();
+      showToast('Logged out of all devices successfully.', 'success');
+      if (onLogoutAll) {
+        onLogoutAll();
+      } else {
+        onBack();
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to logout from all devices', 'error');
+    } finally {
+      setLoggingOutAll(false);
+    }
   };
 
   return (
@@ -192,6 +214,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
                   onValueChange={(val) => handleToggle('autoAcceptSwaps', val)}
                   trackColor={{ false: Colors.surfaceContainer, true: Colors.primaryContainer }}
                   thumbColor={settings?.autoAcceptSwaps ? Colors.primary : Colors.neutralContainer}
+                />
+              </View>
+            </View>
+
+            {/* Account Security Category (Requirement 3: Log out of all devices) */}
+            <Text style={[styles.sectionHeader, { marginTop: Spacing.largeSpacing }]}>
+              Account & Session Security
+            </Text>
+            <View style={styles.settingsGroup}>
+              <View style={[styles.settingItem, { flexDirection: 'column', alignItems: 'flex-start' }]}>
+                <Text style={styles.settingTitle}>Active Devices</Text>
+                <Text style={[styles.settingDescription, { marginTop: 4, marginBottom: 12 }]}>
+                  Immediately invalidate all active sessions and refresh tokens across all other phones and devices.
+                </Text>
+                <Button
+                  title="Log Out of All Devices"
+                  variant="destructive"
+                  loading={loggingOutAll}
+                  onPress={handleLogoutAllDevices}
+                  style={{ width: '100%' }}
                 />
               </View>
             </View>

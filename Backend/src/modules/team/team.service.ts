@@ -1,8 +1,10 @@
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { prisma } from '../../database/prisma';
 import { MembershipRole, MembershipStatus, InvitationStatus } from '@prisma/client';
 import { config } from '../../config/env';
 import { EmailService } from '../../services/email.service';
+import { AuthService } from '../auth/auth.service';
 import { CreateInvitationInput, UpdateMemberInput } from './team.validation';
 
 export class TeamService {
@@ -354,6 +356,91 @@ export class TeamService {
         membershipId: membership.id,
       };
     });
+  }
+
+  /**
+   * Allows an invited user who does not have an account to sign up and immediately land in the team.
+   */
+  static async signUpWithInvitation(token: string, input: { name: string; password: string }) {
+    const invitation = await prisma.invitation.findUnique({
+      where: { token },
+      include: { business: true },
+    });
+
+    if (!invitation || invitation.status !== InvitationStatus.PENDING) {
+      throw new Error('This invitation is no longer valid or has already been used.');
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      await prisma.invitation.update({
+        where: { id: invitation.id },
+        data: { status: InvitationStatus.EXPIRED },
+      });
+      throw new Error('This invitation has expired.');
+    }
+
+    const normalizedEmail = invitation.email.toLowerCase();
+    const existing = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existing) {
+      throw new Error('An account with this email already exists. Please log in to accept the invitation.');
+    }
+
+    const passwordHash = await bcrypt.hash(input.password, config.bcryptSaltRounds);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name: input.name.trim(),
+          email: normalizedEmail,
+          passwordHash,
+          emailVerifiedAt: new Date(),
+        },
+      });
+
+      const membership = await tx.membership.create({
+        data: {
+          businessId: invitation.businessId,
+          userId: newUser.id,
+          role: invitation.role,
+          status: MembershipStatus.ACTIVE,
+        },
+      });
+
+      await tx.invitation.update({
+        where: { id: invitation.id },
+        data: { status: InvitationStatus.ACCEPTED },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          businessId: invitation.businessId,
+          userId: newUser.id,
+          action: 'MEMBER_JOINED_VIA_SIGNUP',
+          resource: 'membership',
+          resourceId: membership.id,
+          metadata: {
+            role: invitation.role,
+            viaInvitationId: invitation.id,
+          },
+        },
+      });
+
+      return { user: newUser, membership };
+    });
+
+    const authRes = await AuthService.login({ email: normalizedEmail, password: input.password });
+
+    return {
+      user: authRes.user,
+      business: invitation.business,
+      membership: result.membership,
+      accessToken: authRes.accessToken,
+      refreshToken: authRes.refreshToken,
+      token: authRes.accessToken,
+    };
   }
 
   /**

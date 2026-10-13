@@ -15,6 +15,8 @@ import { Input } from '../../components/Input';
 import { FeedbackBanner } from '../../components/FeedbackBanner';
 import { api, User } from '../../services/api';
 import { VerifyEmailModal } from './VerifyEmailModal';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
+import { MagicLinkModal } from './MagicLinkModal';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: User) => void;
@@ -26,6 +28,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialTa
 
   // Verify email modal state
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [showMagicLinkModal, setShowMagicLinkModal] = useState(false);
   const [pendingUser, setPendingUser] = useState<User | null>(null);
 
   // Form states
@@ -456,6 +460,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialTa
             success={passwordSuccess}
           />
 
+          {/* Forgot Password link on Login Tab */}
+          {isLoginTab && (
+            <TouchableOpacity
+              onPress={() => setShowForgotPasswordModal(true)}
+              style={styles.forgotPasswordContainer}
+            >
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Password Requirement (Create Account only: hidden by default, displayed alone in real time as user types, length last) */}
           {!isLoginTab && activePasswordRequirement && (
             <View style={styles.passwordRequirementsContainer}>
@@ -481,6 +495,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialTa
             loading={loading}
             style={styles.submitButton}
           />
+
+          {/* Passwordless Magic Link Option on Login */}
+          {isLoginTab && (
+            <View style={styles.alternativeAuthContainer}>
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.dividerLine} />
+              </View>
+              <Button
+                title="Sign in with Magic Link"
+                variant="tonal"
+                onPress={() => setShowMagicLinkModal(true)}
+                style={{ marginTop: Spacing.smallSpacing }}
+              />
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -495,6 +526,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialTa
           }
         }}
         onClose={() => setShowVerifyModal(false)}
+      />
+
+      {/* Password Reset Modal (Single-use expiring token) */}
+      <ForgotPasswordModal
+        visible={showForgotPasswordModal}
+        onClose={() => setShowForgotPasswordModal(false)}
+        onSuccess={() => {
+          setIsLoginTab(true);
+        }}
+      />
+
+      {/* Passwordless Magic Link Modal */}
+      <MagicLinkModal
+        visible={showMagicLinkModal}
+        onClose={() => setShowMagicLinkModal(false)}
+        onAuthSuccess={onAuthSuccess}
       />
     </KeyboardAvoidingView>
   );
@@ -602,5 +649,35 @@ const styles = StyleSheet.create({
   requirementMetText: {
     color: Colors.success,
     fontWeight: '500',
+  },
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
+    marginTop: -4,
+    marginBottom: Spacing.baseSpacing,
+    paddingVertical: 4,
+  },
+  forgotPasswordText: {
+    fontSize: Typography.labelSmall.fontSize,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  alternativeAuthContainer: {
+    marginTop: Spacing.baseSpacing,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.smallSpacing,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.surfaceContainer,
+  },
+  dividerText: {
+    paddingHorizontal: 12,
+    fontSize: 11,
+    color: Colors.neutral,
+    fontWeight: '600',
   },
 });
