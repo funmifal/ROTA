@@ -121,6 +121,29 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     }
   };
 
+  const handleEmailChange = (text: string) => {
+    setEmail(text);
+    if (emailSuccess) setEmailSuccess(false);
+
+    // In create account form, validate email in real time
+    if (!isLoginTab) {
+      const trimmed = text.trim();
+      if (trimmed.length === 0) {
+        setEmailError('');
+      } else {
+        // Stop displaying error the moment the user types a domain after @
+        const hasDomain = /^[^\s@]+@[a-zA-Z0-9.-]+\.[a-zA-Z]+$/.test(trimmed);
+        if (hasDomain) {
+          setEmailError('');
+        } else {
+          setEmailError('Enter A Valid Email Address');
+        }
+      }
+    } else {
+      if (emailError) setEmailError('');
+    }
+  };
+
   const handleEmailBlur = () => {
     // Trim empty spaces at the end
     const trimmed = email.trim();
@@ -131,9 +154,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       setEmailSuccess(false);
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(trimmed)) {
-      setEmailError('Please enter a valid email address');
+      setEmailError('Enter A Valid Email Address');
       setEmailSuccess(false);
       return;
     }
@@ -187,12 +210,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     }
 
     // Validate Email Address
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!email.trim()) {
       setEmailError('Email Address field cannot be empty');
       isValid = false;
     } else if (!emailRegex.test(email.trim())) {
-      setEmailError('Please enter a valid email address');
+      setEmailError('Enter A Valid Email Address');
       isValid = false;
     }
 
@@ -307,11 +330,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           <Input
             label="Email Address"
             value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              if (emailError) setEmailError('');
-              if (emailSuccess) setEmailSuccess(false);
-            }}
+            onChangeText={handleEmailChange}
             onBlur={handleEmailBlur}
             placeholder="name@business.com"
             keyboardType="email-address"

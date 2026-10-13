@@ -19,7 +19,7 @@ export const registerSchema = z.object({
   firstName: z.string().trim().optional(),
   middleName: z.string().trim().optional(),
   lastName: z.string().trim().optional(),
-  email: z.string().trim().email('Invalid email address').toLowerCase(),
+  email: z.string().trim().email('Enter A Valid Email Address').toLowerCase(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
