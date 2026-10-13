@@ -42,31 +42,56 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     setGeneralError('');
   };
 
+  const handleNameBlur = () => {
+    if (!name.trim()) {
+      setNameError('Full Name field cannot be empty');
+    }
+  };
+
+  const handleEmailBlur = () => {
+    if (!email.trim()) {
+      setEmailError('Email Address field cannot be empty');
+    }
+  };
+
+  const handlePasswordBlur = () => {
+    if (!password) {
+      setPasswordError('Password field cannot be empty');
+    }
+  };
+
   const validate = (): boolean => {
     resetErrors();
     let isValid = true;
 
-    if (!isLoginTab && name.trim().length < 2) {
-      setNameError('Name must be at least 2 characters');
-      isValid = false;
+    // Validate Full Name for Sign Up
+    if (!isLoginTab) {
+      if (!name.trim()) {
+        setNameError('Full Name field cannot be empty');
+        isValid = false;
+      } else if (name.trim().length < 2) {
+        setNameError('Name must be at least 2 characters');
+        isValid = false;
+      }
     }
 
+    // Validate Email Address
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim() || !emailRegex.test(email.trim())) {
+    if (!email.trim()) {
+      setEmailError('Email Address field cannot be empty');
+      isValid = false;
+    } else if (!emailRegex.test(email.trim())) {
       setEmailError('Please enter a valid email address');
       isValid = false;
     }
 
-    if (isLoginTab) {
-      if (!password) {
-        setPasswordError('Password is required');
-        isValid = false;
-      }
-    } else {
-      if (password.length < 8) {
-        setPasswordError('Password must be at least 8 characters');
-        isValid = false;
-      }
+    // Validate Password
+    if (!password) {
+      setPasswordError('Password field cannot be empty');
+      isValid = false;
+    } else if (!isLoginTab && password.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+      isValid = false;
     }
 
     return isValid;
@@ -156,6 +181,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
                 setName(text);
                 if (nameError) setNameError('');
               }}
+              onBlur={handleNameBlur}
               placeholder="e.g. Sarah Connor"
               autoCapitalize="words"
               error={nameError}
@@ -170,6 +196,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
               setEmail(text);
               if (emailError) setEmailError('');
             }}
+            onBlur={handleEmailBlur}
             placeholder="name@business.com"
             keyboardType="email-address"
             autoCapitalize="none"
@@ -185,6 +212,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
               setPassword(text);
               if (passwordError) setPasswordError('');
             }}
+            onBlur={handlePasswordBlur}
             placeholder={isLoginTab ? 'Enter your password' : 'Min. 8 characters'}
             secureTextEntry
             autoCapitalize="none"

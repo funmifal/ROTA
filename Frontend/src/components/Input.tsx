@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   TextInput,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TextInputProps,
   ViewStyle,
+  Platform,
 } from 'react-native';
 import { Colors, Typography, Spacing } from '../theme/tokens';
 
@@ -20,18 +21,31 @@ export const Input: React.FC<InputProps> = ({
   error,
   containerStyle,
   style,
+  onFocus,
+  onBlur,
   ...props
 }) => {
+  const [isFocused, setIsFocused] = useState(false);
+
   return (
     <View style={[styles.container, containerStyle]}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         style={[
           styles.input,
+          isFocused ? styles.inputFocused : null,
           error ? styles.inputError : null,
           style,
         ]}
         placeholderTextColor={Colors.neutral}
+        onFocus={(e) => {
+          setIsFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setIsFocused(false);
+          onBlur?.(e);
+        }}
         {...props}
       />
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -62,9 +76,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.baseSpacing,
     paddingVertical: Spacing.mediumSpacing,
     minHeight: 48,
+    ...Platform.select({
+      web: {
+        outlineWidth: 0,
+      },
+    }),
+  },
+  inputFocused: {
+    borderColor: Colors.primary,
   },
   inputError: {
     borderColor: Colors.error,
+    borderWidth: 1.5,
   },
   errorText: {
     fontSize: Typography.bodySmall.fontSize,
