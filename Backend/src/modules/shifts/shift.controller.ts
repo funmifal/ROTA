@@ -202,4 +202,170 @@ export class ShiftController {
       });
     }
   }
+
+  /**
+   * Creates a new shift.
+   * Scoped strictly to the authenticated user's business (OWNER and MANAGER only).
+   */
+  static async createShift(req: Request, res: Response): Promise<void> {
+    try {
+      const membership = req.membership!;
+      const {
+        title,
+        startTime,
+        endTime,
+        breakMinutes = 0,
+        notes,
+        departmentId,
+        locationId,
+        assignedMembershipIds = [],
+      } = req.body;
+
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+
+      if (end <= start) {
+        res.status(400).json({
+          error: 'BadRequest',
+          message: 'Shift end time must be after start time (SHIFT-003, SHIFT-004).',
+        });
+        return;
+      }
+
+      const shift = await prisma.$transaction(async (tx) => {
+        const createdShift = await tx.shift.create({
+          data: {
+            businessId: membership.businessId,
+            title,
+            startTime: start,
+            endTime: end,
+            breakMinutes,
+            notes,
+            departmentId,
+            locationId,
+            status: ShiftStatus.PUBLISHED,
+          },
+        });
+
+        if (assignedMembershipIds.length > 0) {
+          for (const mId of assignedMembershipIds) {
+            await tx.shiftAssignment.create({
+              data: {
+                shiftId: createdShift.id,
+                membershipId: mId,
+              },
+            });
+          }
+        }
+
+        await tx.auditLog.create({
+          data: {
+            businessId: membership.businessId,
+            userId: req.user!.id,
+            action: 'SHIFT_CREATED',
+            resource: 'Shift',
+            metadata: {
+              shiftId: createdShift.id,
+              title: createdShift.title,
+            },
+          },
+        });
+
+        return createdShift;
+      });
+
+      res.status(201).json({
+        message: 'Shift created successfully.',
+        shift,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        error: 'InternalServerError',
+        message: 'Failed to create shift: ' + err.message,
+      });
+    }
+  }
+
+  /**
+   * Deletes a shift.
+   * Scoped strictly by business membership and role (AUTHZ-002, AUTHZ-005, AUTHZ-006, AUDIT-001).
+   * Only OWNER and MANAGER are permitted. STAFF users calling this endpoint directly receive 403 Forbidden.
+   */
+  static async deleteShift(req: Request, res: Response): Promise<void> {
+    try {
+      const membership = req.membership!;
+      const { shiftId } = req.params;
+
+      if (!shiftId) {
+        res.status(400).json({
+          error: 'BadRequest',
+          message: 'shiftId parameter is required.',
+        });
+        return;
+      }
+
+      const shift = await prisma.shift.findFirst({
+        where: {
+          id: shiftId,
+          businessId: membership.businessId,
+        },
+        include: {
+          assignments: true,
+        },
+      });
+
+      if (!shift) {
+        res.status(404).json({
+          error: 'NotFound',
+          message: 'Shift not found in this business.',
+        });
+        return;
+      }
+
+      await prisma.$transaction(async (tx) => {
+        const assignmentIds = shift.assignments.map((a) => a.id);
+        if (assignmentIds.length > 0) {
+          await tx.swapRequest.deleteMany({
+            where: {
+              shiftAssignmentId: { in: assignmentIds },
+            },
+          });
+          await tx.shiftAssignment.deleteMany({
+            where: {
+              id: { in: assignmentIds },
+            },
+          });
+        }
+
+        await tx.shift.delete({
+          where: { id: shift.id },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            businessId: membership.businessId,
+            userId: req.user!.id,
+            action: 'SHIFT_DELETED',
+            resource: 'Shift',
+            metadata: {
+              shiftId: shift.id,
+              title: shift.title,
+              startTime: shift.startTime.toISOString(),
+            },
+          },
+        });
+      });
+
+      res.status(200).json({
+        message: 'Shift deleted successfully.',
+        shiftId: shift.id,
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        error: 'InternalServerError',
+        message: 'Failed to delete shift: ' + err.message,
+      });
+    }
+  }
 }
+

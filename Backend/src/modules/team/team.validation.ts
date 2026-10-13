@@ -1,64 +1,30 @@
 import { MembershipRole, MembershipStatus } from '@prisma/client';
+import { z } from 'zod';
 
-export interface CreateInvitationInput {
-  email: string;
-  role: MembershipRole;
-}
+export const createInvitationSchema = z.object({
+  email: z.string().trim().email('Please provide a valid recipient email address.').toLowerCase(),
+  role: z.enum([MembershipRole.STAFF, MembershipRole.MANAGER]).default(MembershipRole.STAFF),
+});
 
-export interface UpdateMemberInput {
-  role?: MembershipRole;
-  status?: MembershipStatus;
-}
+export const updateMemberSchema = z.object({
+  role: z.enum([MembershipRole.STAFF, MembershipRole.MANAGER, MembershipRole.OWNER]).optional(),
+  status: z.nativeEnum(MembershipStatus).optional(),
+}).refine((data) => data.role !== undefined || data.status !== undefined, {
+  message: 'At least one of role or status must be provided.',
+});
+
+export const signUpWithInvitationSchema = z.object({
+  name: z.string().trim().min(2, 'Name must be at least 2 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(64),
+});
+
+export type CreateInvitationInput = z.infer<typeof createInvitationSchema>;
+export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;
 
 export function validateCreateInvitationInput(input: any): CreateInvitationInput {
-  if (!input || typeof input !== 'object') {
-    throw new Error('Invalid request payload.');
-  }
-
-  const email = typeof input.email === 'string' ? input.email.trim().toLowerCase() : '';
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email || !emailRegex.test(email)) {
-    throw new Error('Please provide a valid recipient email address.');
-  }
-
-  let role: MembershipRole = MembershipRole.STAFF;
-  if (input.role) {
-    if (input.role === 'MANAGER') {
-      role = MembershipRole.MANAGER;
-    } else if (input.role === 'STAFF') {
-      role = MembershipRole.STAFF;
-    } else {
-      throw new Error('Invalid invitation role. Supported roles: STAFF, MANAGER.');
-    }
-  }
-
-  return { email, role };
+  return createInvitationSchema.parse(input);
 }
 
 export function validateUpdateMemberInput(input: any): UpdateMemberInput {
-  if (!input || typeof input !== 'object') {
-    throw new Error('Invalid request payload.');
-  }
-
-  const validated: UpdateMemberInput = {};
-
-  if (input.role !== undefined) {
-    if (input.role === 'MANAGER') {
-      validated.role = MembershipRole.MANAGER;
-    } else if (input.role === 'STAFF') {
-      validated.role = MembershipRole.STAFF;
-    } else {
-      throw new Error('Invalid role. Supported roles: STAFF, MANAGER.');
-    }
-  }
-
-  if (input.status !== undefined) {
-    if (Object.values(MembershipStatus).includes(input.status)) {
-      validated.status = input.status;
-    } else {
-      throw new Error('Invalid membership status.');
-    }
-  }
-
-  return validated;
+  return updateMemberSchema.parse(input);
 }

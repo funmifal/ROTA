@@ -47,6 +47,7 @@ import activityRoutes from './modules/activity/activity.routes';
 import settingsRoutes from './modules/settings/settings.routes';
 import shiftRoutes from './modules/shifts/shift.routes';
 import swapRoutes from './modules/swaps/swap.routes';
+import billingRoutes from './modules/billing/billing.routes';
 
 app.use('/api/users/settings', settingsRoutes);
 app.use('/api/businesses', businessRoutes);
@@ -54,6 +55,8 @@ app.use('/api/businesses/:businessId', teamRoutes);
 app.use('/api/businesses/:businessId', activityRoutes);
 app.use('/api/businesses/:businessId', shiftRoutes);
 app.use('/api/businesses/:businessId', swapRoutes);
+app.use('/api/businesses/:businessId/billing', billingRoutes);
+app.use('/api/businesses/:businessId/subscription', billingRoutes);
 app.use('/api/invitations', invitationRoutes);
 
 // Protected dashboard route (required by Checkpoint 2: "Add a protected route the dashboard can call.")
