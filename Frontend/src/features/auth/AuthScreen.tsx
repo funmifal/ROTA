@@ -45,6 +45,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const handleNameBlur = () => {
     if (!name.trim()) {
       setNameError('Full Name field cannot be empty');
+    } else if (/[^a-zA-Z\s]/.test(name)) {
+      setNameError('Name Must Use Only Letters');
+    } else if (name.trim().length < 2) {
+      setNameError('Name must be at least 2 characters');
+    }
+  };
+
+  const handleNameChange = (text: string) => {
+    setName(text);
+    if (/[^a-zA-Z\s]/.test(text)) {
+      setNameError('Name Must Use Only Letters');
+    } else if (nameError) {
+      setNameError('');
+    }
+  };
+
+  const handleNameKeyPress = (e: any) => {
+    const key = e.nativeEvent?.key;
+    if (key && key.length === 1 && /[^a-zA-Z\s]/.test(key)) {
+      setNameError('Name Must Use Only Letters');
     }
   };
 
@@ -68,6 +88,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     if (!isLoginTab) {
       if (!name.trim()) {
         setNameError('Full Name field cannot be empty');
+        isValid = false;
+      } else if (/[^a-zA-Z\s]/.test(name)) {
+        setNameError('Name Must Use Only Letters');
         isValid = false;
       } else if (name.trim().length < 2) {
         setNameError('Name must be at least 2 characters');
@@ -177,10 +200,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             <Input
               label="Full Name"
               value={name}
-              onChangeText={(text) => {
-                setName(text);
-                if (nameError) setNameError('');
-              }}
+              onChangeText={handleNameChange}
+              onKeyPress={handleNameKeyPress}
               onBlur={handleNameBlur}
               placeholder="e.g. Sarah Connor"
               autoCapitalize="words"
