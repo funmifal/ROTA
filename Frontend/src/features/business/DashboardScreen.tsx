@@ -398,6 +398,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
           visible={showUpgradeModal}
           businessId={activeBusiness.id}
           businessName={activeBusiness.name}
+          currentUserRole={activeBusiness.currentUserRole || 'OWNER'}
           onClose={() => setShowUpgradeModal(false)}
         />
       )}

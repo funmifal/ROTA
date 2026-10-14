@@ -8,6 +8,8 @@ import {
   ScrollView,
   Linking,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Effects } from '../../theme/tokens';
@@ -19,6 +21,7 @@ interface UpgradePlanModalProps {
   visible: boolean;
   businessId: string;
   businessName: string;
+  currentUserRole?: string;
   onClose: () => void;
 }
 
@@ -96,6 +99,7 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
   visible,
   businessId,
   businessName,
+  currentUserRole,
   onClose,
 }) => {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('yearly');
@@ -103,34 +107,72 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successInfo, setSuccessInfo] = useState('');
+  const [activePaymentUrl, setActivePaymentUrl] = useState<string | null>(null);
 
   const activePlanDetail = PLANS.find((p) => p.id === selectedPlan) || PLANS[1];
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (targetPlan?: PlanTier) => {
+    const planToUse = targetPlan || selectedPlan;
+    const planDetail = PLANS.find((p) => p.id === planToUse) || activePlanDetail;
+
+    if (currentUserRole && currentUserRole !== 'OWNER') {
+      const msg = `Only the business Owner can upgrade subscriptions (AUTHZ-006). Your current role is ${currentUserRole}.`;
+      setError(msg);
+      Alert.alert('Owner Action Required', msg);
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
       setSuccessInfo('');
+      setActivePaymentUrl(null);
+
+      console.log(`[UpgradeModal] Initiating checkout for business ${businessId}, plan ${planToUse}`);
 
       const res = await api.initiateCheckout(businessId, {
-        planId: selectedPlan,
-        seats: activePlanDetail.seats,
+        planId: planToUse,
+        seats: planDetail.seats,
         currency: 'USD',
       });
 
       if (res.checkout && res.checkout.paymentUrl) {
-        setSuccessInfo('Redirecting you to Flutterwave Secure Checkout...');
-        const supported = await Linking.canOpenURL(res.checkout.paymentUrl);
-        if (supported) {
-          await Linking.openURL(res.checkout.paymentUrl);
+        const paymentUrl = res.checkout.paymentUrl;
+        setActivePaymentUrl(paymentUrl);
+        setSuccessInfo('Opening secure Flutterwave payment gateway...');
+
+        // Handle opening browser cleanly on Web and Native
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          const opened = window.open(paymentUrl, '_blank');
+          if (!opened) {
+            window.location.href = paymentUrl;
+          }
         } else {
-          await Linking.openURL(res.checkout.paymentUrl);
+          try {
+            await Linking.openURL(paymentUrl);
+          } catch (linkErr) {
+            console.warn('[UpgradeModal] Direct Linking.openURL failed, prompting user:', linkErr);
+            Alert.alert(
+              'Checkout Ready',
+              'Your secure Flutterwave link is ready. Tap Proceed to open your payment page.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Proceed to Payment',
+                  onPress: () => Linking.openURL(paymentUrl).catch(() => {}),
+                },
+              ]
+            );
+          }
         }
       } else {
         throw new Error('No checkout payment URL returned from Flutterwave gateway.');
       }
     } catch (err: any) {
-      setError(err.message || 'Unable to initiate Flutterwave checkout. Please try again.');
+      console.error('[UpgradeModal] Checkout initiation error:', err);
+      const errMsg = err.message || 'Unable to initiate Flutterwave checkout. Please try again.';
+      setError(errMsg);
+      Alert.alert('Checkout Notice', errMsg);
     } finally {
       setLoading(false);
     }
@@ -342,6 +384,36 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
                       </View>
                     ))}
                   </View>
+
+                  <View style={styles.planCardActionRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.selectPlanButton,
+                        isSelected && styles.selectPlanButtonActive,
+                      ]}
+                      onPress={() => {
+                        setSelectedPlan(plan.id);
+                        handleCheckout(plan.id);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text
+                        style={[
+                          styles.selectPlanButtonText,
+                          isSelected && styles.selectPlanButtonTextActive,
+                        ]}
+                      >
+                        {isSelected
+                          ? `Upgrade to ${plan.name} ($${displayPrice}/mo)`
+                          : `Choose ${plan.name}`}
+                      </Text>
+                      <Ionicons
+                        name={isSelected ? 'arrow-forward' : 'chevron-forward'}
+                        size={16}
+                        color={isSelected ? Colors.onPrimary : Colors.primary}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -360,6 +432,36 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
 
           {/* Bottom Actions */}
           <View style={styles.footer}>
+            {/* Inline Footer Feedback */}
+            {error ? (
+              <View style={styles.footerBannerSpacing}>
+                <FeedbackBanner type="error" message={error} />
+              </View>
+            ) : null}
+
+            {successInfo ? (
+              <View style={styles.footerBannerSpacing}>
+                <FeedbackBanner type="success" message={successInfo} />
+              </View>
+            ) : null}
+
+            {activePaymentUrl ? (
+              <TouchableOpacity
+                style={styles.openLinkButton}
+                onPress={() => {
+                  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                    window.open(activePaymentUrl, '_blank') || (window.location.href = activePaymentUrl);
+                  } else {
+                    Linking.openURL(activePaymentUrl).catch(() => {});
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="open-outline" size={18} color={Colors.onPrimary} />
+                <Text style={styles.openLinkButtonText}>Tap to Open Checkout Page</Text>
+              </TouchableOpacity>
+            ) : null}
+
             <View style={styles.footerPricingSummary}>
               <Text style={styles.summaryLabel}>Total Today:</Text>
               <Text style={styles.summaryValue}>
@@ -376,7 +478,7 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
                   ? 'Connecting to Flutterwave...'
                   : `Upgrade to ${activePlanDetail.name} Plan`
               }
-              onPress={handleCheckout}
+              onPress={() => handleCheckout(selectedPlan)}
               loading={loading}
               disabled={loading}
               variant="primary"
@@ -688,10 +790,60 @@ const styles = StyleSheet.create({
   footer: {
     backgroundColor: Colors.surfaceContainerLowest,
     paddingHorizontal: Spacing.baseSpacing,
-    paddingVertical: Spacing.mediumSpacing,
+    paddingTop: Spacing.smallSpacing,
+    paddingBottom: Platform.OS === 'ios' ? 32 : Spacing.baseSpacing,
     borderTopWidth: 1,
     borderTopColor: Colors.neutralContainer,
+    zIndex: 100,
     ...Effects.softShadow,
+    elevation: 12,
+  },
+  footerBannerSpacing: {
+    marginBottom: Spacing.smallSpacing,
+  },
+  openLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.tertiary,
+    paddingVertical: Spacing.smallSpacing,
+    paddingHorizontal: Spacing.baseSpacing,
+    borderRadius: 8,
+    marginBottom: Spacing.smallSpacing,
+    gap: 8,
+  },
+  openLinkButtonText: {
+    ...Typography.labelMedium,
+    color: Colors.onTertiary,
+    fontWeight: '700',
+  },
+  planCardActionRow: {
+    marginTop: Spacing.mediumSpacing,
+  },
+  selectPlanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surfaceContainerHigh,
+    paddingVertical: Spacing.smallSpacing,
+    paddingHorizontal: Spacing.baseSpacing,
+    borderRadius: 8,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: Colors.neutralContainer,
+  },
+  selectPlanButtonActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  selectPlanButtonText: {
+    ...Typography.labelMedium,
+    color: Colors.onSurface,
+    fontWeight: '600',
+  },
+  selectPlanButtonTextActive: {
+    color: Colors.onPrimary,
+    fontWeight: '700',
   },
   footerPricingSummary: {
     flexDirection: 'row',
@@ -715,3 +867,4 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
 });
+

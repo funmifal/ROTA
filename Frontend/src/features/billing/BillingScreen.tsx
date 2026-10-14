@@ -301,6 +301,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({ business }) => {
         visible={upgradeModalVisible}
         businessId={business.id}
         businessName={business.name}
+        currentUserRole={(business as any).currentUserRole || 'OWNER'}
         onClose={() => {
           setUpgradeModalVisible(false);
           fetchBillingInfo();
