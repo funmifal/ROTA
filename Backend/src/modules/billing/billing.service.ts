@@ -2,6 +2,7 @@ import { prisma } from '../../database/prisma';
 import { ProrationService } from './proration.service';
 import { LedgerService } from './ledger.service';
 import { PlanTier, SubscriptionStatus, LedgerEntryType, PaymentStatus, PLANS, calculateMonthlyPlanCostCents } from './billing.types';
+import { config } from '../../config/env';
 
 export class BillingService {
   /**
@@ -192,6 +193,8 @@ export class BillingService {
         where: { idempotencyKey },
       });
       if (existingPayment) {
+        const metadata = (existingPayment.metadata as any) || {};
+        const paymentUrl = metadata.paymentUrl || `https://checkout.flutterwave.com/v3/hosted/pay/${existingPayment.txRef}`;
         return {
           message: 'Existing checkout session retrieved.',
           checkout: {
@@ -199,7 +202,7 @@ export class BillingService {
             amountCents: existingPayment.amountCents,
             currency: existingPayment.currency,
             status: existingPayment.status,
-            paymentUrl: `https://checkout.flutterwave.com/v3/hosted/pay/${existingPayment.txRef}`,
+            paymentUrl,
           },
         };
       }
@@ -207,6 +210,52 @@ export class BillingService {
 
     const amountCents = calculateMonthlyPlanCostCents(plan, seats);
     const txRef = `rota_sub_${businessId}_${Date.now()}`;
+    const amountInDollars = (amountCents / 100).toFixed(2);
+
+    let paymentUrl = `https://checkout.flutterwave.com/v3/hosted/pay/${txRef}`;
+
+    // Request an active, live/test hosted checkout session link from Flutterwave v3 API
+    if (config.flutterwave.secretKey && !config.flutterwave.secretKey.includes('your-flutterwave')) {
+      try {
+        const flwRes = await fetch('https://api.flutterwave.com/v3/payments', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${config.flutterwave.secretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tx_ref: txRef,
+            amount: amountInDollars,
+            currency: 'USD',
+            redirect_url: `${config.appUrl}/api/businesses/${businessId}/billing/callback`,
+            customer: {
+              email: userEmail,
+              name: userEmail.split('@')[0],
+            },
+            customizations: {
+              title: 'Rota Subscription',
+              description: `${plan} Plan (${seats} seats)`,
+              logo: 'https://cdn-icons-png.flaticon.com/512/3652/3652191.png',
+            },
+            meta: {
+              businessId,
+              userId,
+              plan,
+              seats,
+            },
+          }),
+        });
+
+        const flwData: any = await flwRes.json();
+        if (flwData?.status === 'success' && flwData?.data?.link) {
+          paymentUrl = flwData.data.link;
+        } else {
+          console.warn('[Flutterwave] Checkout initialization returned:', flwData?.message || flwData);
+        }
+      } catch (err: any) {
+        console.error('[Flutterwave] Failed to call payments API:', err.message);
+      }
+    }
 
     const payment = await prisma.payment.create({
       data: {
@@ -217,7 +266,7 @@ export class BillingService {
         provider: 'FLUTTERWAVE',
         txRef,
         idempotencyKey,
-        metadata: { plan, seats, userId, userEmail },
+        metadata: { plan, seats, userId, userEmail, paymentUrl },
       },
     });
 
@@ -230,7 +279,7 @@ export class BillingService {
         plan,
         seats,
         status: payment.status,
-        paymentUrl: `https://checkout.flutterwave.com/v3/hosted/pay/${payment.txRef}`,
+        paymentUrl,
       },
     };
   }
