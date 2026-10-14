@@ -249,6 +249,49 @@ export const api = {
     });
   },
 
+  // Subscription & Flutterwave Billing
+  async getSubscription(businessId: string): Promise<{
+    subscription: any;
+    seatUsage: { activeSeats: number; billableSeats: number; maxIncludedSeats: number; extraSeats: number };
+  }> {
+    return request<{
+      subscription: any;
+      seatUsage: { activeSeats: number; billableSeats: number; maxIncludedSeats: number; extraSeats: number };
+    }>(`/api/businesses/${businessId}/billing`);
+  },
+
+  async initiateCheckout(
+    businessId: string,
+    data: { planId: 'STARTER' | 'TEAM' | 'BUSINESS'; seats: number; currency?: string }
+  ): Promise<{
+    message: string;
+    checkout: {
+      txRef: string;
+      amountCents: number;
+      currency: string;
+      plan: string;
+      seats: number;
+      status: string;
+      paymentUrl: string;
+    };
+  }> {
+    return request<{
+      message: string;
+      checkout: {
+        txRef: string;
+        amountCents: number;
+        currency: string;
+        plan: string;
+        seats: number;
+        status: string;
+        paymentUrl: string;
+      };
+    }>(`/api/businesses/${businessId}/billing/checkout`, {
+      method: 'POST',
+      body: JSON.stringify({ ...data, currency: data.currency || 'USD' }),
+    });
+  },
+
   // Team & Invitations
   async getMembers(businessId: string): Promise<{ members: TeamMember[] }> {
     return request<{ members: TeamMember[] }>(`/api/businesses/${businessId}/members`);

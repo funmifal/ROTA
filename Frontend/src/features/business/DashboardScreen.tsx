@@ -13,6 +13,7 @@ import { Button } from '../../components/Button';
 import { FeedbackBanner } from '../../components/FeedbackBanner';
 import { api, User, Business, DashboardSummary } from '../../services/api';
 import { CreateBusinessModal } from './CreateBusinessModal';
+import { UpgradePlanModal } from '../billing/UpgradePlanModal';
 import { TeamScreen } from '../team/TeamScreen';
 import { ActivityFeedScreen } from '../activity/ActivityFeedScreen';
 import { ShiftsScreen } from '../shifts/ShiftsScreen';
@@ -32,6 +33,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
   const [error, setError] = useState('');
   const [loggingOut, setLoggingOut] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showTeamScreen, setShowTeamScreen] = useState(false);
   const [showActivityFeed, setShowActivityFeed] = useState(false);
   const [showShiftsScreen, setShowShiftsScreen] = useState(false);
@@ -214,6 +216,30 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
                   </View>
                 </View>
 
+                {/* Upgrade Plan Banner */}
+                <TouchableOpacity
+                  style={styles.upgradePlanBanner}
+                  onPress={() => setShowUpgradeModal(true)}
+                  activeOpacity={0.85}
+                  accessibilityLabel="Upgrade Plan Button"
+                >
+                  <View style={styles.upgradeBannerLeft}>
+                    <View style={styles.upgradeIconWrap}>
+                      <Ionicons name="sparkles" size={18} color={Colors.tertiary} />
+                    </View>
+                    <View style={styles.upgradeBannerTextWrap}>
+                      <Text style={styles.upgradeBannerTitle}>Free Plan (5 Seats)</Text>
+                      <Text style={styles.upgradeBannerSubtitle}>
+                        Upgrade to unlock 15–40+ seats, automated swaps & Flutterwave billing
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.upgradeBannerButton}>
+                    <Text style={styles.upgradeBannerButtonText}>Upgrade</Text>
+                    <Ionicons name="chevron-forward" size={14} color={Colors.onPrimary} />
+                  </View>
+                </TouchableOpacity>
+
                 {/* Primary Action: Upcoming Shifts */}
                 <Button
                   title="Upcoming Shifts (Offline & Swaps)"
@@ -306,6 +332,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
         onSuccess={handleBusinessCreated}
         onClose={() => setCreateModalVisible(false)}
       />
+
+      {activeBusiness && (
+        <UpgradePlanModal
+          visible={showUpgradeModal}
+          businessId={activeBusiness.id}
+          businessName={activeBusiness.name}
+          onClose={() => setShowUpgradeModal(false)}
+        />
+      )}
     </View>
   );
 };
@@ -533,5 +568,61 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     backgroundColor: Colors.surfaceContainerLow,
+  },
+  upgradePlanBanner: {
+    backgroundColor: Colors.tertiaryContainer,
+    borderRadius: 12,
+    padding: Spacing.mediumSpacing,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.smallSpacing,
+    marginBottom: Spacing.smallSpacing,
+    borderWidth: 1,
+    borderColor: '#ffc885',
+  },
+  upgradeBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    paddingRight: Spacing.smallSpacing,
+  },
+  upgradeIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.surfaceContainerLowest,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.smallSpacing,
+  },
+  upgradeBannerTextWrap: {
+    flex: 1,
+  },
+  upgradeBannerTitle: {
+    fontSize: Typography.labelLarge.fontSize,
+    lineHeight: Typography.labelLarge.lineHeight,
+    fontWeight: '700',
+    color: Colors.onTertiaryContainer,
+  },
+  upgradeBannerSubtitle: {
+    fontSize: Typography.bodySmall.fontSize,
+    color: Colors.onTertiaryContainer,
+    marginTop: 2,
+    opacity: 0.85,
+  },
+  upgradeBannerButton: {
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    gap: 2,
+  },
+  upgradeBannerButtonText: {
+    color: Colors.onPrimary,
+    fontWeight: '700',
+    fontSize: Typography.labelMedium.fontSize,
   },
 });

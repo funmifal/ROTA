@@ -22,5 +22,11 @@ export const config = {
       pass: process.env.SMTP_PASS || '',
     },
   },
+  flutterwave: {
+    publicKey: process.env.FLW_PUBLIC_KEY || '',
+    secretKey: process.env.FLW_SECRET_KEY || '',
+    encryptionKey: process.env.FLW_ENCRYPTION_KEY || '',
+    secretHash: process.env.FLW_SECRET_HASH || 'rota_flw_webhook_secret_hash_dev',
+  },
 };
 
