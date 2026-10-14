@@ -108,14 +108,68 @@ export class NotificationService {
   }
 
   /**
+   * Computes milliseconds remaining until the end of quiet hours in the user's specific timezone.
+   */
+  static getDelayUntilQuietHoursEnd(
+    quietHoursEnd: string, // e.g. "06:00" or "08:00"
+    timezone: string = 'Africa/Lagos',
+    now: Date = new Date()
+  ): number {
+    try {
+      const [endH, endM] = quietHoursEnd.split(':').map((v) => parseInt(v, 10));
+
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone || 'Africa/Lagos',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+
+      const parts = formatter.formatToParts(now);
+      const getVal = (t: string) => parts.find((p) => p.type === t)?.value || '0';
+      const year = parseInt(getVal('year'), 10);
+      const month = parseInt(getVal('month'), 10);
+      const day = parseInt(getVal('day'), 10);
+      const curHour = parseInt(getVal('hour'), 10);
+      const curMin = parseInt(getVal('minute'), 10);
+
+      let targetDay = day;
+      if (curHour > endH || (curHour === endH && curMin >= endM)) {
+        targetDay += 1;
+      }
+
+      // Calculate time difference accurately
+      const utcDate = new Date(now.toISOString());
+      const tzDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+      const offsetMs = tzDate.getTime() - utcDate.getTime();
+
+      const targetLocal = new Date(year, month - 1, targetDay, endH, endM, 0, 0);
+      const targetUtcMs = targetLocal.getTime() - offsetMs;
+
+      const delayMs = targetUtcMs - now.getTime();
+      return Math.max(delayMs, 1000);
+    } catch {
+      return 30 * 60 * 1000; // Fallback: 30 minutes
+    }
+  }
+
+  /**
    * Checks user notification category preferences and quiet hours.
-   * Returns whether push delivery is permitted.
+   * Returns whether push delivery is permitted, suppressed, or delayed until quiet hours end.
    */
   static async shouldDeliverPushNotification(
     userId: string,
     type: NotificationType,
-    dateNow: Date = new Date()
-  ): Promise<{ deliver: boolean; reason?: string }> {
+    isUrgentOrDate?: boolean | Date,
+    dateNowArg?: Date
+  ): Promise<{ deliver: boolean; delayed?: boolean; delayMs?: number; reason?: string }> {
+    const isUrgent = typeof isUrgentOrDate === 'boolean' ? isUrgentOrDate : false;
+    const dateNow = isUrgentOrDate instanceof Date ? isUrgentOrDate : dateNowArg || new Date();
+
     const settings = await prisma.userSettings.findUnique({
       where: { userId },
     });
@@ -142,7 +196,7 @@ export class NotificationService {
       return { deliver: false, reason: 'Billing notifications disabled by user.' };
     }
 
-    // 3. Quiet hours check
+    // 3. Quiet hours check & non-urgent delay
     if (settings.quietHoursEnabled) {
       const inQuietHours = this.isWithinQuietHours(
         settings.quietHoursStart,
@@ -152,9 +206,24 @@ export class NotificationService {
       );
 
       if (inQuietHours) {
+        if (isUrgent) {
+          return {
+            deliver: true,
+            reason: 'Urgent notification overrides quiet hours.',
+          };
+        }
+
+        const delayMs = this.getDelayUntilQuietHoursEnd(
+          settings.quietHoursEnd,
+          settings.timezone,
+          dateNow
+        );
+
         return {
           deliver: false,
-          reason: `Current time falls within user quiet hours (${settings.quietHoursStart}-${settings.quietHoursEnd} ${settings.timezone}).`,
+          delayed: true,
+          delayMs,
+          reason: `Current time falls within user quiet hours (${settings.quietHoursStart}-${settings.quietHoursEnd} ${settings.timezone}). Non-urgent notification delayed until quiet hours end.`,
         };
       }
     }

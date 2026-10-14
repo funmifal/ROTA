@@ -11,6 +11,8 @@ export function useUserSettings() {
   return useQuery<UserSettings, Error>({
     queryKey: ['userSettings'],
     staleTime: CACHE_TIMES.SETTINGS_STALE_MS,
+    refetchOnWindowFocus: true, // Foreground refetch on device switch
+    refetchInterval: 30000,     // Polling interval: 30s to sync across devices without reinstall
     queryFn: async () => {
       const res = await api.getSettings();
       return res.settings;
@@ -25,8 +27,9 @@ export function useUserSettings() {
  * 1. Cancels outgoing refetches.
  * 2. Takes a snapshot of previous settings.
  * 3. Optimistically updates query cache so switch/toggle changes immediately.
- * 4. If server fails (or simulated failure), reverts switch to previous value.
- * 5. Reconciles with server on settle.
+ * 4. Passes clientUpdatedAt snapshot for server conflict resolution (Last-Write-Wins).
+ * 5. If server fails (or simulated failure), reverts switch to previous value.
+ * 6. Reconciles with server on settle.
  */
 export function useUpdateUserSettings() {
   const queryClient = useQueryClient();
@@ -34,7 +37,7 @@ export function useUpdateUserSettings() {
   const showToast = useAppStore((s) => s.showToast);
 
   return useMutation<
-    { message: string; settings: UserSettings },
+    { message: string; settings: UserSettings; conflictResolved?: boolean },
     Error,
     Partial<UserSettings>,
     { previousSettings?: UserSettings }
@@ -57,6 +60,11 @@ export function useUpdateUserSettings() {
           ...previousSettings,
           ...newValues,
         });
+
+        // Pass clientUpdatedAt for server conflict detection
+        if (previousSettings.updatedAt && !newValues.clientUpdatedAt) {
+          newValues.clientUpdatedAt = previousSettings.updatedAt;
+        }
       }
 
       return { previousSettings };

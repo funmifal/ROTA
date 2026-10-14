@@ -296,6 +296,96 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onLogout
                   thumbColor={settings?.autoAcceptSwaps ? Colors.primary : Colors.neutralContainer}
                 />
               </View>
+
+              <View style={styles.settingItemDivider} />
+
+              {/* Theme Selection */}
+              <View style={[styles.settingItem, { flexDirection: 'column', alignItems: 'flex-start' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 10 }}>
+                  <Ionicons name="color-palette-outline" size={20} color={Colors.primary} />
+                  <View>
+                    <Text style={styles.settingTitle}>App Theme</Text>
+                    <Text style={styles.settingDescription}>Select your visual theme preference</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, width: '100%', marginTop: 4 }}>
+                  {(['system', 'light', 'dark'] as const).map((t) => (
+                    <TouchableOpacity
+                      key={t}
+                      onPress={() => updateSettings({ theme: t })}
+                      style={[
+                        styles.choicePill,
+                        (settings?.theme || 'system') === t && styles.choicePillActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.choicePillText,
+                          (settings?.theme || 'system') === t && styles.choicePillTextActive,
+                        ]}
+                      >
+                        {t.toUpperCase()}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.settingItemDivider} />
+
+              {/* Language Selection */}
+              <View style={[styles.settingItem, { flexDirection: 'column', alignItems: 'flex-start' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 10 }}>
+                  <Ionicons name="language-outline" size={20} color={Colors.primary} />
+                  <View>
+                    <Text style={styles.settingTitle}>Language</Text>
+                    <Text style={styles.settingDescription}>Select your interface language</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%', marginTop: 4 }}>
+                  {[
+                    { code: 'en', label: 'English' },
+                    { code: 'fr', label: 'Français' },
+                    { code: 'es', label: 'Español' },
+                    { code: 'yo', label: 'Yorùbá' },
+                    { code: 'ha', label: 'Hausa' },
+                    { code: 'ig', label: 'Igbo' },
+                  ].map((l) => (
+                    <TouchableOpacity
+                      key={l.code}
+                      onPress={() => updateSettings({ language: l.code })}
+                      style={[
+                        styles.choicePill,
+                        (settings?.language || 'en') === l.code && styles.choicePillActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.choicePillText,
+                          (settings?.language || 'en') === l.code && styles.choicePillTextActive,
+                        ]}
+                      >
+                        {l.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.settingItemDivider} />
+
+              {/* Timezone & Sync Info */}
+              <View style={styles.settingItem}>
+                <View style={styles.settingLeft}>
+                  <Ionicons name="globe-outline" size={20} color={Colors.primary} />
+                  <View style={styles.settingTextContainer}>
+                    <Text style={styles.settingTitle}>Active Time Zone</Text>
+                    <Text style={styles.settingDescription}>
+                      {settings?.timezone || 'Africa/Lagos'} (Synced across all devices)
+                    </Text>
+                  </View>
+                </View>
+              </View>
             </View>
 
             {/* Account Security Category (Requirement 3: Log out of all devices) */}
@@ -453,5 +543,26 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: Typography.bodyMedium.fontSize,
     color: Colors.neutral,
+  },
+  choicePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: Colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  choicePillActive: {
+    backgroundColor: Colors.primaryContainer,
+    borderColor: Colors.primary,
+  },
+  choicePillText: {
+    fontSize: Typography.labelMedium.fontSize,
+    fontWeight: '600',
+    color: Colors.neutral,
+  },
+  choicePillTextActive: {
+    color: Colors.primary,
+    fontWeight: '700',
   },
 });

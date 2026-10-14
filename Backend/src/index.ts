@@ -20,6 +20,10 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Task A: Read and Write routing with Read-Your-Own-Writes consistency
+import { readYourOwnWritesMiddleware } from './database/dbRouter';
+app.use(readYourOwnWritesMiddleware);
+
 // Security middleware: Passwords must NEVER be transmitted in URLs or query parameters
 app.use((req: Request, res: Response, next) => {
   if (req.query && ('password' in req.query || 'pass' in req.query || 'pwd' in req.query)) {

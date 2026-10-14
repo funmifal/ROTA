@@ -403,6 +403,9 @@ export interface UserSettings {
   timeFormat24h: boolean;
   autoAcceptSwaps: boolean;
   theme: string;
+  language?: string;
+  updatedAt?: string;
+  clientUpdatedAt?: string;
 }
 
 export interface ShiftItem {

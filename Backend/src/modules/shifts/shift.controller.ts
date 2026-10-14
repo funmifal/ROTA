@@ -1,15 +1,26 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../database/prisma';
 import { ShiftStatus, MembershipRole } from '@prisma/client';
+import { CacheService } from '../../services/cache.service';
 
 export class ShiftController {
   /**
    * Retrieves upcoming published shifts for the business and current user.
    * Scoped strictly by business membership (AUTHZ-002, AUTHZ-003).
+   * Cached in Redis with TTL 300s.
    */
   static async getUpcomingShifts(req: Request, res: Response): Promise<void> {
     try {
       const membership = req.membership!;
+      const cacheKey = `cache:shifts:${membership.businessId}:upcoming:${membership.membershipId}`;
+
+      const cachedResult = await CacheService.get<{ shifts: any[]; serverTime: string }>(cacheKey);
+      if (cachedResult) {
+        res.setHeader('X-Cache-Status', 'HIT');
+        res.status(200).json(cachedResult);
+        return;
+      }
+
       const now = new Date();
 
       // Retrieve shifts starting from now onwards (or active today)
@@ -80,10 +91,16 @@ export class ShiftController {
         };
       });
 
-      res.status(200).json({
+      const responsePayload = {
         shifts: formattedShifts,
         serverTime: now.toISOString(),
-      });
+      };
+
+      // Cache shifts response in Redis for 300 seconds
+      await CacheService.set(cacheKey, responsePayload, 300);
+
+      res.setHeader('X-Cache-Status', 'MISS');
+      res.status(200).json(responsePayload);
     } catch (err: any) {
       res.status(500).json({
         error: 'InternalServerError',
@@ -274,6 +291,10 @@ export class ShiftController {
         return createdShift;
       });
 
+      // Invalidate shift calendar and activity feed cache for this business
+      await CacheService.invalidatePattern(`cache:shifts:${membership.businessId}:*`);
+      await CacheService.del(`cache:activity:${membership.businessId}:page1`);
+
       res.status(201).json({
         message: 'Shift created successfully.',
         shift,
@@ -355,6 +376,10 @@ export class ShiftController {
           },
         });
       });
+
+      // Invalidate shift calendar and activity feed cache for this business
+      await CacheService.invalidatePattern(`cache:shifts:${membership.businessId}:*`);
+      await CacheService.del(`cache:activity:${membership.businessId}:page1`);
 
       res.status(200).json({
         message: 'Shift deleted successfully.',

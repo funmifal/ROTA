@@ -1,18 +1,14 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, focusManager } from '@tanstack/react-query';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 
-/**
- * Global TanStack QueryClient Configuration.
- * 
- * Cache Strategy & Sensible Times Rationale:
- * - staleTime (default: 2 minutes):
- *   Server data is considered fresh for 2 minutes. During this period, navigating
- *   between screens or re-focusing will instantly read from the in-memory cache
- *   without triggering unnecessary network roundtrips.
- * - gcTime / cacheTime (10 minutes):
- *   Inactive cache queries remain in memory for 10 minutes before being garbage collected.
- * - retry: 2 with exponential backoff for queries, ensuring resilience on unstable cellular connections.
- * - mutations: retry: 0 by default so optimistic updates and rollback can provide immediate user feedback.
- */
+// Synchronize React Native AppState with TanStack Query focusManager
+// Automatically triggers foreground refetches when user switches back to the app
+AppState.addEventListener('change', (status: AppStateStatus) => {
+  if (Platform.OS !== 'web') {
+    focusManager.setFocused(status === 'active');
+  }
+});
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -25,7 +21,7 @@ export const queryClient = new QueryClient({
         }
         return failureCount < 2;
       },
-      refetchOnWindowFocus: false, // Prevent jarring layout refetches in mobile React Native
+      refetchOnWindowFocus: true,  // Auto-refresh when app comes to foreground
       refetchOnReconnect: true,    // Auto-refresh when cellular/wifi reconnects
     },
     mutations: {

@@ -1,13 +1,22 @@
 import { Request, Response } from 'express';
 import { TeamService } from './team.service';
 import { validateCreateInvitationInput, validateUpdateMemberInput } from './team.validation';
+import { CacheService } from '../../services/cache.service';
 
 export class TeamController {
   static async listMembers(req: Request, res: Response): Promise<void> {
     try {
       const { businessId } = req.params;
-      const members = await TeamService.listMembers(businessId);
-      res.status(200).json({ members });
+      const cacheKey = `cache:roster:${businessId}`;
+
+      const { data: members, cached } = await CacheService.getOrSet(
+        cacheKey,
+        300,
+        () => TeamService.listMembers(businessId)
+      );
+
+      res.setHeader('X-Cache-Status', cached ? 'HIT' : 'MISS');
+      res.status(200).json({ members, cached });
     } catch (err: any) {
       res.status(500).json({
         error: 'InternalServerError',
@@ -149,6 +158,9 @@ export class TeamController {
       const input = validateUpdateMemberInput(req.body);
       const member = await TeamService.updateMember(businessId, memberId, req.user.id, input);
 
+      // Invalidate team roster cache upon role/status mutation
+      await CacheService.del(`cache:roster:${businessId}`);
+
       res.status(200).json({
         message: 'Team member updated successfully.',
         member,
@@ -170,6 +182,9 @@ export class TeamController {
 
       const { businessId, memberId } = req.params;
       await TeamService.removeMember(businessId, memberId, req.user.id, req.membership.role);
+
+      // Invalidate team roster cache upon member removal
+      await CacheService.del(`cache:roster:${businessId}`);
 
       res.status(200).json({
         message: 'Team member removed from business.',

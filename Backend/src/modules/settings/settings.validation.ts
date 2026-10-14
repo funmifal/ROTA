@@ -14,6 +14,8 @@ export const updateSettingsSchema = z.object({
   timeFormat24h: z.boolean().optional(),
   autoAcceptSwaps: z.boolean().optional(),
   theme: z.enum(['light', 'dark', 'system']).optional(),
+  language: z.string().min(2).max(10).optional(),
+  clientUpdatedAt: z.string().datetime().optional(),
 }).refine((data) => Object.keys(data).length > 0, {
   message: 'At least one setting must be provided.',
 });

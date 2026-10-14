@@ -5,6 +5,8 @@ export interface PushNotificationPayload {
   type: NotificationType;
   title: string;
   body: string;
+  isUrgent?: boolean;
+  isDelayedRun?: boolean;
   data?: {
     url?: string;
     screen?: string;

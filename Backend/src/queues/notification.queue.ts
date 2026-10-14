@@ -103,22 +103,59 @@ async function sendExpoPushNotifications(
 export async function processPushNotification(payload: PushNotificationPayload): Promise<void> {
   const { userId, type, title, body, data } = payload;
 
-  // 1. Always record in-app notification in database with deep linking data
-  await prisma.notification.create({
-    data: {
-      userId,
-      type,
-      title,
-      body,
-      data: data || {},
-    },
-  });
+  // 1. If not a delayed retry run, record in-app notification in database with deep linking data
+  if (!payload.isDelayedRun) {
+    await prisma.notification.create({
+      data: {
+        userId,
+        type,
+        title,
+        body,
+        data: data || {},
+      },
+    });
+  }
 
   // 2. Evaluate user delivery settings & quiet hours
-  const check = await NotificationService.shouldDeliverPushNotification(userId, type);
-  if (!check.deliver) {
-    console.log(`[PushService] Push suppressed for user ${userId} (${type}): ${check.reason}`);
-    return;
+  if (!payload.isDelayedRun) {
+    const check = await NotificationService.shouldDeliverPushNotification(
+      userId,
+      type,
+      payload.isUrgent
+    );
+
+    if (check.delayed && check.delayMs) {
+      console.log(
+        `[PushService] Quiet hours active for user ${userId}. Non-urgent notification delayed by ${Math.round(
+          check.delayMs / 60000
+        )}m.`
+      );
+
+      const delayedPayload = { ...payload, isDelayedRun: true };
+      if (isRedisAvailable && pushQueue) {
+        try {
+          await pushQueue.add('send-push', delayedPayload, { delay: check.delayMs });
+          return;
+        } catch {
+          // Fall through to setTimeout
+        }
+      }
+
+      // Safe fallback timer for delayed execution
+      setTimeout(async () => {
+        try {
+          await processPushNotification(delayedPayload);
+        } catch (err) {
+          console.error('[PushQueue] Delayed notification delivery error:', err);
+        }
+      }, check.delayMs);
+      return;
+    }
+
+    if (!check.deliver) {
+      console.log(`[PushService] Push suppressed for user ${userId} (${type}): ${check.reason}`);
+      return;
+    }
   }
 
   // 3. Retrieve all active registered devices for this user

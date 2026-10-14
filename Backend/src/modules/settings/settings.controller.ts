@@ -49,7 +49,27 @@ export class SettingsController {
         timeFormat24h,
         autoAcceptSwaps,
         theme,
+        language,
+        clientUpdatedAt,
       } = req.body;
+
+      // Conflict handling (Last-Write-Wins with authoritative server updatedAt):
+      // Check if existing record has a newer server updatedAt than the client's snapshot
+      const existingSettings = await prisma.userSettings.findUnique({
+        where: { userId },
+      });
+
+      let hadConflict = false;
+      if (existingSettings && clientUpdatedAt) {
+        const clientTimestamp = new Date(clientUpdatedAt).getTime();
+        const serverTimestamp = existingSettings.updatedAt.getTime();
+        if (serverTimestamp > clientTimestamp) {
+          hadConflict = true;
+          console.log(
+            `[SettingsCoordination] Conflict detected for user ${userId}: Server timestamp (${existingSettings.updatedAt.toISOString()}) is newer than client snapshot (${clientUpdatedAt}). Applying Last-Write-Wins (LWW) rule.`
+          );
+        }
+      }
 
       const settings = await prisma.userSettings.upsert({
         where: { userId },
@@ -68,6 +88,8 @@ export class SettingsController {
           timeFormat24h: typeof timeFormat24h === 'boolean' ? timeFormat24h : false,
           autoAcceptSwaps: typeof autoAcceptSwaps === 'boolean' ? autoAcceptSwaps : false,
           theme: typeof theme === 'string' ? theme : 'system',
+          language: typeof language === 'string' ? language : 'en',
+          updatedAt: new Date(),
         },
         update: {
           ...(typeof notificationsEnabled === 'boolean' ? { notificationsEnabled } : {}),
@@ -83,12 +105,16 @@ export class SettingsController {
           ...(typeof timeFormat24h === 'boolean' ? { timeFormat24h } : {}),
           ...(typeof autoAcceptSwaps === 'boolean' ? { autoAcceptSwaps } : {}),
           ...(typeof theme === 'string' ? { theme } : {}),
+          ...(typeof language === 'string' ? { language } : {}),
+          updatedAt: new Date(),
         },
       });
 
       res.status(200).json({
         message: 'Settings updated successfully',
         settings,
+        conflictResolved: hadConflict,
+        resolutionStrategy: 'LAST_WRITE_WINS',
       });
     } catch (err: any) {
       res.status(500).json({
