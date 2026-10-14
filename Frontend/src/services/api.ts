@@ -33,8 +33,55 @@ export interface DashboardSummary {
   };
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
+async function rotateTokens(): Promise<string | null> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = await storage.getRefreshToken();
+      if (!refreshToken) {
+        await storage.clearTokens();
+        return null;
+      }
+
+      const refreshRes = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (refreshRes.ok) {
+        const refreshData = await refreshRes.json();
+        const newAccessToken = refreshData.accessToken || refreshData.token;
+        const newRefreshToken = refreshData.refreshToken;
+        await storage.saveTokens(newAccessToken, newRefreshToken);
+        return newAccessToken;
+      } else {
+        await storage.clearTokens();
+        return null;
+      }
+    } catch (err) {
+      console.warn('[api] Failed to rotate tokens:', err);
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}, isRetry = false): Promise<T> {
-  const token = await storage.getAccessToken();
+  let token = await storage.getAccessToken();
+
+  // If token is missing for protected endpoints, attempt proactive token rotation
+  if (!token && !endpoint.includes('/api/auth/') && !endpoint.includes('/health')) {
+    token = await rotateTokens();
+  }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -57,7 +104,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}, isRetry =
     throw new Error(`Cannot connect to Rota server at ${API_BASE_URL}. Ensure server is running and device is on the same network.`);
   }
 
-  // Self-study requirement: automatic refresh token rotation when short-lived access token expires
+  // Automatic refresh token rotation when short-lived access token expires
   if (
     response.status === 401 &&
     !isRetry &&
@@ -65,32 +112,18 @@ async function request<T>(endpoint: string, options: RequestInit = {}, isRetry =
     !endpoint.includes('/api/auth/register') &&
     !endpoint.includes('/api/auth/refresh')
   ) {
-    const refreshToken = await storage.getRefreshToken();
-    if (refreshToken) {
-      try {
-        const refreshRes = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
-        });
-
-        if (refreshRes.ok) {
-          const refreshData = await refreshRes.json();
-          await storage.saveTokens(refreshData.accessToken, refreshData.refreshToken);
-          return request<T>(endpoint, options, true); // Retry with rotated access token
-        } else {
-          // If refresh token was already used (stolen token detection) or expired, clear storage
-          await storage.clearTokens();
-        }
-      } catch {
-        await storage.clearTokens();
-      }
+    const newAccessToken = await rotateTokens();
+    if (newAccessToken) {
+      return request<T>(endpoint, options, true); // Retry with rotated access token
     }
   }
 
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
+    if (response.status === 401 && !endpoint.includes('/api/auth/login')) {
+      throw new Error('Your session has expired. Please log out and sign in again to continue.');
+    }
     const errorMsg = data?.message || data?.error || `HTTP error ${response.status}`;
     throw new Error(errorMsg);
   }

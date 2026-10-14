@@ -22,6 +22,7 @@ interface UpgradePlanModalProps {
   businessId: string;
   businessName: string;
   currentUserRole?: string;
+  onLogout?: () => void;
   onClose: () => void;
 }
 
@@ -100,6 +101,7 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
   businessId,
   businessName,
   currentUserRole,
+  onLogout,
   onClose,
 }) => {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('yearly');
@@ -172,7 +174,29 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
       console.error('[UpgradeModal] Checkout initiation error:', err);
       const errMsg = err.message || 'Unable to initiate Flutterwave checkout. Please try again.';
       setError(errMsg);
-      Alert.alert('Checkout Notice', errMsg);
+
+      if (
+        errMsg.toLowerCase().includes('session') ||
+        errMsg.toLowerCase().includes('authentication') ||
+        errMsg.toLowerCase().includes('token')
+      ) {
+        Alert.alert(
+          'Session Expired',
+          'Your authentication session has expired. Please sign back in to complete your plan upgrade.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Sign In Again',
+              onPress: () => {
+                onClose();
+                onLogout?.();
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Checkout Notice', errMsg);
+      }
     } finally {
       setLoading(false);
     }

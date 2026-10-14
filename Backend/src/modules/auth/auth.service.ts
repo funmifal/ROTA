@@ -208,6 +208,14 @@ export class AuthService {
 
     // CASE 1: Token reuse detected (stolen token indicator)
     if (tokenRecord && (tokenRecord.isRevoked || tokenRecord.usedAt !== null)) {
+      // Allow a 30-second grace period for concurrent requests from the same client session (RFC 6749 / OAuth 2.0 Security BCP)
+      const isWithinGracePeriod = tokenRecord.usedAt && (Date.now() - tokenRecord.usedAt.getTime() < 30000);
+
+      if (isWithinGracePeriod) {
+        const user = tokenRecord.user;
+        return this.generateTokenPair(user.id, user.email, user.tokenVersion, tokenRecord.familyId);
+      }
+
       console.warn(`[SECURITY ALERT] Refresh token reuse detected for user ${tokenRecord.userId}, family ${tokenRecord.familyId}`);
       
       // Revoke the ENTIRE token family and increment tokenVersion to revoke all access tokens
