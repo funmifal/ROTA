@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import { BillingService } from './billing.service';
 import { LedgerService } from './ledger.service';
-import { enqueueWebhookEvent } from '../../queues/webhook.queue';
+import { enqueueWebhookEvent, processWebhookEvent } from '../../queues/webhook.queue';
 import { prisma } from '../../database/prisma';
+import { config } from '../../config/env';
+import { PaymentStatus, PlanTier } from '@prisma/client';
 
 export class BillingController {
   /**
@@ -185,4 +187,89 @@ export class BillingController {
       });
     }
   }
+
+  /**
+   * Verifies pending transaction with Flutterwave API and activates subscription.
+   */
+  static async verifyLatestPayment(req: Request, res: Response): Promise<void> {
+    try {
+      const membership = req.membership!;
+      const businessId = membership.businessId;
+
+      // Find the latest pending payment for this business
+      const latestPayment = await prisma.payment.findFirst({
+        where: { businessId, status: PaymentStatus.PENDING },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!latestPayment) {
+        const sub = await prisma.subscription.findUnique({ where: { businessId } });
+        res.status(200).json({
+          verified: false,
+          message: 'No pending payments found.',
+          subscription: sub,
+        });
+        return;
+      }
+
+      // Verify with Flutterwave
+      let isVerified = false;
+      let flwData: any = null;
+
+      if (config.flutterwave.secretKey && !config.flutterwave.secretKey.includes('your-flutterwave')) {
+        const flwRes = await fetch(
+          `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${latestPayment.txRef}`,
+          {
+            headers: { Authorization: `Bearer ${config.flutterwave.secretKey}` },
+          }
+        );
+        flwData = await flwRes.json();
+        if (flwData?.status === 'success' && flwData?.data?.status === 'successful') {
+          isVerified = true;
+        }
+      }
+
+      if (isVerified && flwData?.data) {
+        const metadata = (latestPayment.metadata as any) || {};
+        const plan = (flwData.data.meta?.plan || metadata.plan || 'TEAM') as PlanTier;
+        const seats = Number(flwData.data.meta?.seats || metadata.seats || 15);
+        const amountCents = latestPayment.amountCents;
+
+        await processWebhookEvent({
+          eventId: String(flwData.data.id || latestPayment.id),
+          provider: 'FLUTTERWAVE',
+          eventType: 'charge.completed',
+          payload: {
+            id: flwData.data.id,
+            txRef: latestPayment.txRef,
+            amountCents,
+            businessId,
+            plan,
+            seats,
+            data: flwData.data,
+          },
+        });
+
+        const updatedSub = await prisma.subscription.findUnique({ where: { businessId } });
+
+        res.status(200).json({
+          verified: true,
+          message: `Payment successfully verified. Upgraded to ${plan} Plan!`,
+          subscription: updatedSub,
+        });
+        return;
+      }
+
+      res.status(200).json({
+        verified: false,
+        message: 'Payment has not been confirmed yet by Flutterwave.',
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        error: 'VerificationError',
+        message: 'Failed to verify payment: ' + err.message,
+      });
+    }
+  }
 }
+

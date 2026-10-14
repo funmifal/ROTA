@@ -33,9 +33,16 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({ business }) => {
 
   const showToast = useAppStore((s) => s.showToast);
 
-  const fetchBillingInfo = async () => {
+  const fetchBillingInfo = async (showReconcileNotice = false) => {
     try {
       setError('');
+      const verifyRes = await api.verifyLatestPayment(business.id).catch(() => null);
+      if (verifyRes?.verified) {
+        showToast(verifyRes.message, 'success');
+      } else if (showReconcileNotice && verifyRes) {
+        showToast(verifyRes.message, 'info');
+      }
+
       const [subRes, ledgerRes] = await Promise.all([
         api.getSubscription(business.id).catch(() => null),
         api.getBillingLedger(business.id).catch(() => ({ ledger: [] })),
@@ -62,7 +69,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({ business }) => {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchBillingInfo();
+    fetchBillingInfo(true);
   };
 
   const handlePreviewUpgrade = async (targetPlan: 'TEAM' | 'BUSINESS', targetSeats: number) => {
@@ -95,7 +102,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({ business }) => {
           <Text style={styles.appBarSubtitle}>{business.name}</Text>
         </View>
         <TouchableOpacity
-          onPress={fetchBillingInfo}
+          onPress={() => fetchBillingInfo(true)}
           style={styles.refreshButton}
           accessibilityLabel="Refresh Billing"
         >
@@ -302,6 +309,7 @@ export const BillingScreen: React.FC<BillingScreenProps> = ({ business }) => {
         businessId={business.id}
         businessName={business.name}
         currentUserRole={(business as any).currentUserRole || 'OWNER'}
+        currentActivePlan={currentPlan}
         onClose={() => {
           setUpgradeModalVisible(false);
           fetchBillingInfo();

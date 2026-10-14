@@ -325,6 +325,20 @@ export const api = {
     });
   },
 
+  async verifyLatestPayment(businessId: string): Promise<{
+    verified: boolean;
+    message: string;
+    subscription?: any;
+  }> {
+    return request<{
+      verified: boolean;
+      message: string;
+      subscription?: any;
+    }>(`/api/businesses/${businessId}/billing/verify-latest`, {
+      method: 'POST',
+    });
+  },
+
   async getBillingLedger(businessId: string): Promise<{ ledger: any }> {
     return request<{ ledger: any }>(`/api/businesses/${businessId}/billing/ledger`);
   },

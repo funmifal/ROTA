@@ -399,8 +399,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
           businessId={activeBusiness.id}
           businessName={activeBusiness.name}
           currentUserRole={activeBusiness.currentUserRole || 'OWNER'}
+          currentActivePlan={(activeBusiness as any).subscription?.plan}
           onLogout={handleLogout}
-          onClose={() => setShowUpgradeModal(false)}
+          onClose={() => {
+            setShowUpgradeModal(false);
+            fetchInitialData();
+          }}
         />
       )}
     </View>

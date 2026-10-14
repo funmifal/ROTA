@@ -70,6 +70,17 @@ function MainAppContent() {
             setInviteToken(token);
           }
         }
+
+        // Check for payment return deep links (rota://billing)
+        if (parsed.path?.includes('billing') || parsed.hostname === 'billing') {
+          const status = parsed.queryParams?.status as string;
+          const plan = (parsed.queryParams?.plan as string) || 'Team';
+          if (status === 'success') {
+            showToast(`🎉 Payment Successful! Your ${plan} Plan is now activated.`, 'success');
+          } else {
+            showToast('Payment processing completed.', 'info');
+          }
+        }
       } catch (err) {
         console.warn('Failed to parse incoming deep link URL:', err);
       }

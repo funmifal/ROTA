@@ -22,6 +22,7 @@ interface UpgradePlanModalProps {
   businessId: string;
   businessName: string;
   currentUserRole?: string;
+  currentActivePlan?: string;
   onLogout?: () => void;
   onClose: () => void;
 }
@@ -101,11 +102,14 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
   businessId,
   businessName,
   currentUserRole,
+  currentActivePlan,
   onLogout,
   onClose,
 }) => {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('yearly');
-  const [selectedPlan, setSelectedPlan] = useState<PlanTier>('TEAM');
+  const [selectedPlan, setSelectedPlan] = useState<PlanTier>(
+    currentActivePlan === 'TEAM' ? 'BUSINESS' : currentActivePlan === 'BUSINESS' ? 'BUSINESS' : 'TEAM'
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successInfo, setSuccessInfo] = useState('');
@@ -350,6 +354,7 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
             <Text style={styles.plansHeader}>Select a Plan</Text>
             {PLANS.map((plan) => {
               const isSelected = selectedPlan === plan.id;
+              const isCurrentActive = currentActivePlan === plan.id;
               const displayPrice =
                 billingCycle === 'yearly' ? plan.yearlyMonthlyPrice : plan.monthlyPrice;
 
@@ -360,11 +365,16 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
                     styles.planCard,
                     isSelected && styles.planCardSelected,
                     plan.isPopular && styles.planCardPopular,
+                    isCurrentActive && styles.planCardCurrentActive,
                   ]}
                   onPress={() => setSelectedPlan(plan.id)}
                   activeOpacity={0.85}
                 >
-                  {plan.isPopular ? (
+                  {isCurrentActive ? (
+                    <View style={styles.currentActiveBadge}>
+                      <Text style={styles.currentActiveBadgeText}>YOUR CURRENT ACTIVE PLAN</Text>
+                    </View>
+                  ) : plan.isPopular ? (
                     <View style={styles.popularBadge}>
                       <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
                     </View>
@@ -402,7 +412,7 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
                         <Ionicons
                           name="checkmark-circle"
                           size={16}
-                          color={isSelected ? Colors.primary : Colors.secondary}
+                          color={isCurrentActive ? Colors.success : isSelected ? Colors.primary : Colors.secondary}
                         />
                         <Text style={styles.planFeatureText}>{feat}</Text>
                       </View>
@@ -413,28 +423,34 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
                     <TouchableOpacity
                       style={[
                         styles.selectPlanButton,
-                        isSelected && styles.selectPlanButtonActive,
+                        isCurrentActive && styles.selectPlanButtonCurrent,
+                        !isCurrentActive && isSelected && styles.selectPlanButtonActive,
                       ]}
                       onPress={() => {
+                        if (isCurrentActive) return;
                         setSelectedPlan(plan.id);
                         handleCheckout(plan.id);
                       }}
+                      disabled={isCurrentActive}
                       activeOpacity={0.8}
                     >
                       <Text
                         style={[
                           styles.selectPlanButtonText,
-                          isSelected && styles.selectPlanButtonTextActive,
+                          isCurrentActive && styles.selectPlanButtonTextCurrent,
+                          !isCurrentActive && isSelected && styles.selectPlanButtonTextActive,
                         ]}
                       >
-                        {isSelected
+                        {isCurrentActive
+                          ? 'Current Active Plan'
+                          : isSelected
                           ? `Upgrade to ${plan.name} ($${displayPrice}/mo)`
                           : `Choose ${plan.name}`}
                       </Text>
                       <Ionicons
-                        name={isSelected ? 'arrow-forward' : 'chevron-forward'}
+                        name={isCurrentActive ? 'checkmark-circle' : isSelected ? 'arrow-forward' : 'chevron-forward'}
                         size={16}
-                        color={isSelected ? Colors.onPrimary : Colors.primary}
+                        color={isCurrentActive ? Colors.success : isSelected ? Colors.onPrimary : Colors.primary}
                       />
                     </TouchableOpacity>
                   </View>
@@ -500,12 +516,14 @@ export const UpgradePlanModal: React.FC<UpgradePlanModalProps> = ({
               title={
                 loading
                   ? 'Connecting to Flutterwave...'
+                  : selectedPlan === currentActivePlan
+                  ? `${activePlanDetail.name} Plan is Already Active`
                   : `Upgrade to ${activePlanDetail.name} Plan`
               }
               onPress={() => handleCheckout(selectedPlan)}
               loading={loading}
-              disabled={loading}
-              variant="primary"
+              disabled={loading || selectedPlan === currentActivePlan}
+              variant={selectedPlan === currentActivePlan ? 'tonal' : 'primary'}
             />
           </View>
         </View>
@@ -867,6 +885,34 @@ const styles = StyleSheet.create({
   },
   selectPlanButtonTextActive: {
     color: Colors.onPrimary,
+    fontWeight: '700',
+  },
+  planCardCurrentActive: {
+    borderColor: Colors.success,
+    borderWidth: 2,
+    backgroundColor: Colors.surfaceContainerLow,
+  },
+  currentActiveBadge: {
+    backgroundColor: Colors.success,
+    paddingHorizontal: Spacing.smallSpacing,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginBottom: Spacing.smallSpacing,
+  },
+  currentActiveBadgeText: {
+    ...Typography.labelSmall,
+    color: '#00210b',
+    fontWeight: '800',
+    fontSize: 10,
+  },
+  selectPlanButtonCurrent: {
+    backgroundColor: Colors.surfaceContainerHighest,
+    borderColor: Colors.success,
+    borderWidth: 1,
+  },
+  selectPlanButtonTextCurrent: {
+    color: Colors.success,
     fontWeight: '700',
   },
   footerPricingSummary: {

@@ -85,6 +85,7 @@ export class BusinessService {
       include: {
         business: {
           include: {
+            subscription: true,
             _count: {
               select: {
                 memberships: {
