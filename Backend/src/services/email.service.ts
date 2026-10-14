@@ -45,6 +45,26 @@ export class EmailService {
   }
 
   /**
+   * Identifies test, example, or simulated dummy emails to avoid sending real
+   * SMTP requests that result in inbox bounce-back notifications.
+   */
+  private static isTestOrDummyEmail(email: string): boolean {
+    const lower = email.toLowerCase().trim();
+    return (
+      lower.endsWith('@example.com') ||
+      lower.endsWith('@test.com') ||
+      lower.endsWith('@rota.com') ||
+      lower.endsWith('.test') ||
+      lower.endsWith('.example') ||
+      lower.endsWith('@mailinator.com') ||
+      lower.includes('loadtest') ||
+      lower.includes('test_') ||
+      lower.includes('staff_') ||
+      lower.includes('dummy_')
+    );
+  }
+
+  /**
    * Sends a one-time email verification link and 6-digit verification code using Nodemailer.
    *
    * @param to Recipient email address
@@ -58,6 +78,11 @@ export class EmailService {
     token: string,
     code?: string
   ): Promise<{ messageId: string; previewUrl?: string | false }> {
+    if (this.isTestOrDummyEmail(to)) {
+      console.log(`[EmailService] Simulated delivery to test address ${to} (bypassed external SMTP to prevent bounce).`);
+      return { messageId: `simulated_verification_${Date.now()}` };
+    }
+
     const transporter = await this.getTransporter();
     const verificationUrl = `${config.appUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
 
@@ -162,6 +187,11 @@ If you did not sign up for Rota, you can safely ignore this email.
     role: string,
     token: string
   ): Promise<{ messageId: string }> {
+    if (this.isTestOrDummyEmail(to)) {
+      console.log(`[EmailService] Simulated delivery to test address ${to} (bypassed external SMTP to prevent bounce).`);
+      return { messageId: `simulated_invitation_${Date.now()}` };
+    }
+
     const transporter = await this.getTransporter();
     const inviteUrl = `${config.appUrl}/invite/${encodeURIComponent(token)}`;
 
@@ -233,6 +263,11 @@ This invitation link expires in 7 days.
     name: string,
     token: string
   ): Promise<{ messageId: string }> {
+    if (this.isTestOrDummyEmail(to)) {
+      console.log(`[EmailService] Simulated delivery to test address ${to} (bypassed external SMTP to prevent bounce).`);
+      return { messageId: `simulated_password_reset_${Date.now()}` };
+    }
+
     const transporter = await this.getTransporter();
     const resetUrl = `${config.appUrl}/reset-password?token=${encodeURIComponent(token)}`;
     const deepLinkUrl = `rota://reset-password?token=${encodeURIComponent(token)}`;
@@ -309,6 +344,11 @@ If you did not request this, please ignore this email.
     to: string,
     token: string
   ): Promise<{ messageId: string }> {
+    if (this.isTestOrDummyEmail(to)) {
+      console.log(`[EmailService] Simulated delivery to test address ${to} (bypassed external SMTP to prevent bounce).`);
+      return { messageId: `simulated_magic_link_${Date.now()}` };
+    }
+
     const transporter = await this.getTransporter();
     const magicUrl = `${config.appUrl}/magic-login?token=${encodeURIComponent(token)}`;
     const deepLinkUrl = `rota://magic-login?token=${encodeURIComponent(token)}`;
