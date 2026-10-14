@@ -14,7 +14,7 @@ import { Business } from '../services/api';
  *    modal visibility, simulated offline testing mode) without contaminating server query cache.
  */
 
-export type AppTab = 'dashboard' | 'shifts' | 'activity' | 'team' | 'settings';
+export type AppTab = 'dashboard' | 'shifts' | 'team' | 'billing' | 'activity' | 'settings';
 
 interface AppState {
   // Navigation & Tab state

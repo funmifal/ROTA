@@ -14,6 +14,8 @@ import { FeedbackBanner } from '../../components/FeedbackBanner';
 import { api, User, Business, DashboardSummary } from '../../services/api';
 import { CreateBusinessModal } from './CreateBusinessModal';
 import { UpgradePlanModal } from '../billing/UpgradePlanModal';
+import { BillingScreen } from '../billing/BillingScreen';
+import { BottomNavBar } from '../../components/BottomNavBar';
 import { TeamScreen } from '../team/TeamScreen';
 import { ActivityFeedScreen } from '../activity/ActivityFeedScreen';
 import { ShiftsScreen } from '../shifts/ShiftsScreen';
@@ -34,10 +36,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
   const [loggingOut, setLoggingOut] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [showTeamScreen, setShowTeamScreen] = useState(false);
-  const [showActivityFeed, setShowActivityFeed] = useState(false);
-  const [showShiftsScreen, setShowShiftsScreen] = useState(false);
-  const [showSettingsScreen, setShowSettingsScreen] = useState(false);
+
+  const activeTab = useAppStore((s) => s.activeTab);
+  const setActiveTab = useAppStore((s) => s.setActiveTab);
+  const setStoreActiveBusiness = useAppStore((s) => s.setActiveBusiness);
 
   const fetchInitialData = async () => {
     try {
@@ -52,6 +54,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
       setBusinesses(bizRes.businesses);
       if (bizRes.businesses.length > 0) {
         setActiveBusiness(bizRes.businesses[0]);
+        setStoreActiveBusiness(bizRes.businesses[0]);
       }
       setSummary(summaryRes);
     } catch (err: any) {
@@ -79,53 +82,32 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
     setCreateModalVisible(false);
     setBusinesses((prev) => [newBiz, ...prev]);
     setActiveBusiness(newBiz);
+    setStoreActiveBusiness(newBiz);
   };
 
-  if (showShiftsScreen && activeBusiness) {
-    return (
-      <ShiftsScreen
-        business={activeBusiness}
-        onBack={() => {
-          setShowShiftsScreen(false);
-          fetchInitialData();
-        }}
-      />
-    );
-  }
+  const handleSelectBusiness = (biz: Business) => {
+    setActiveBusiness(biz);
+    setStoreActiveBusiness(biz);
+  };
 
-  if (showSettingsScreen) {
-    return (
-      <SettingsScreen
-        onBack={() => setShowSettingsScreen(false)}
-        onLogoutAll={handleLogout}
+  const renderNoBusinessPlaceholder = (featureName: string) => (
+    <View style={styles.noBizContainer}>
+      <Ionicons name="business-outline" size={48} color={Colors.neutral} />
+      <Text style={styles.noBizTitle}>No Business Selected</Text>
+      <Text style={styles.noBizSubtitle}>
+        Create or select a business organization to manage {featureName}.
+      </Text>
+      <Button
+        title="Create Business"
+        onPress={() => setCreateModalVisible(true)}
+        variant="primary"
+        style={{ marginTop: Spacing.mediumSpacing }}
       />
-    );
-  }
+    </View>
+  );
 
-  if (showTeamScreen && activeBusiness) {
-    return (
-      <TeamScreen
-        business={activeBusiness}
-        currentUserRole={activeBusiness.currentUserRole || 'STAFF'}
-        onBack={() => {
-          setShowTeamScreen(false);
-          fetchInitialData();
-        }}
-      />
-    );
-  }
-
-  if (showActivityFeed && activeBusiness) {
-    return (
-      <ActivityFeedScreen
-        business={activeBusiness}
-        onBack={() => setShowActivityFeed(false)}
-      />
-    );
-  }
-
-  return (
-    <View style={styles.container}>
+  const renderDashboardOverview = () => (
+    <View style={{ flex: 1 }}>
       {/* App Bar / Header */}
       <View style={styles.appBar}>
         <View>
@@ -135,7 +117,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <TouchableOpacity
             style={styles.settingsIconButton}
-            onPress={() => setShowSettingsScreen(true)}
+            onPress={() => setActiveTab('settings')}
             accessibilityLabel="Settings"
           >
             <Ionicons name="settings-outline" size={20} color={Colors.onSurface} />
@@ -219,7 +201,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
                 {/* Upgrade Plan Banner */}
                 <TouchableOpacity
                   style={styles.upgradePlanBanner}
-                  onPress={() => setShowUpgradeModal(true)}
+                  onPress={() => setActiveTab('billing')}
                   activeOpacity={0.85}
                   accessibilityLabel="Upgrade Plan Button"
                 >
@@ -243,7 +225,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
                 {/* Primary Action: Upcoming Shifts */}
                 <Button
                   title="Upcoming Shifts (Offline & Swaps)"
-                  onPress={() => setShowShiftsScreen(true)}
+                  onPress={() => setActiveTab('shifts')}
                   variant="primary"
                   style={{ marginTop: Spacing.smallSpacing, marginBottom: Spacing.smallSpacing }}
                 />
@@ -251,13 +233,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
                 <View style={styles.bizActionRow}>
                   <Button
                     title="Team & Invites"
-                    onPress={() => setShowTeamScreen(true)}
+                    onPress={() => setActiveTab('team')}
                     variant="tonal"
                     style={{ flex: 1 }}
                   />
                   <Button
                     title="Activity Feed"
-                    onPress={() => setShowActivityFeed(true)}
+                    onPress={() => setActiveTab('activity')}
                     variant="tonal"
                     style={{ flex: 1, marginLeft: Spacing.smallSpacing }}
                   />
@@ -276,7 +258,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
                         styles.switcherChip,
                         biz.id === activeBusiness?.id && styles.activeSwitcherChip,
                       ]}
-                      onPress={() => setActiveBusiness(biz)}
+                      onPress={() => handleSelectBusiness(biz)}
                     >
                       <Text
                         style={[
@@ -303,7 +285,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
           <TouchableOpacity
             style={styles.statCard}
             onPress={() => {
-              if (activeBusiness) setShowShiftsScreen(true);
+              if (activeBusiness) setActiveTab('shifts');
             }}
           >
             <Text style={styles.statNumber}>
@@ -315,7 +297,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
           <TouchableOpacity
             style={styles.statCard}
             onPress={() => {
-              if (activeBusiness) setShowShiftsScreen(true);
+              if (activeBusiness) setActiveTab('shifts');
             }}
           >
             <Text style={styles.statNumber}>
@@ -326,6 +308,84 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ user, onLogout
           </TouchableOpacity>
         </View>
       </ScrollView>
+    </View>
+  );
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'shifts':
+        if (!activeBusiness) {
+          return renderNoBusinessPlaceholder('Shifts & Schedules');
+        }
+        return (
+          <ShiftsScreen
+            business={activeBusiness}
+            onBack={() => {
+              setActiveTab('dashboard');
+              fetchInitialData();
+            }}
+          />
+        );
+
+      case 'team':
+        if (!activeBusiness) {
+          return renderNoBusinessPlaceholder('Team & Invites');
+        }
+        return (
+          <TeamScreen
+            business={activeBusiness}
+            currentUserRole={activeBusiness.currentUserRole || 'STAFF'}
+            onBack={() => {
+              setActiveTab('dashboard');
+              fetchInitialData();
+            }}
+          />
+        );
+
+      case 'billing':
+        if (!activeBusiness) {
+          return renderNoBusinessPlaceholder('Billing & Subscriptions');
+        }
+        return (
+          <BillingScreen
+            business={activeBusiness}
+            onUpgrade={() => setShowUpgradeModal(true)}
+          />
+        );
+
+      case 'settings':
+        return (
+          <SettingsScreen
+            onBack={() => setActiveTab('dashboard')}
+            onLogoutAll={handleLogout}
+          />
+        );
+
+      case 'activity':
+        if (!activeBusiness) {
+          return renderNoBusinessPlaceholder('Activity Feed');
+        }
+        return (
+          <ActivityFeedScreen
+            business={activeBusiness}
+            onBack={() => setActiveTab('dashboard')}
+          />
+        );
+
+      case 'dashboard':
+      default:
+        return renderDashboardOverview();
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.tabContentArea}>{renderTabContent()}</View>
+
+      <BottomNavBar
+        activeTab={activeTab === 'activity' ? 'dashboard' : activeTab}
+        onTabChange={(tab) => setActiveTab(tab)}
+      />
 
       <CreateBusinessModal
         visible={createModalVisible}
@@ -624,5 +684,28 @@ const styles = StyleSheet.create({
     color: Colors.onPrimary,
     fontWeight: '700',
     fontSize: Typography.labelMedium.fontSize,
+  },
+  tabContentArea: {
+    flex: 1,
+  },
+  noBizContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.largeSpacing,
+    backgroundColor: Colors.surface,
+  },
+  noBizTitle: {
+    ...Typography.titleLarge,
+    color: Colors.onSurface,
+    fontWeight: '700',
+    marginTop: Spacing.baseSpacing,
+  },
+  noBizSubtitle: {
+    ...Typography.bodyMedium,
+    color: Colors.onSurfaceVariant,
+    textAlign: 'center',
+    marginTop: Spacing.smallSpacing,
+    marginBottom: Spacing.baseSpacing,
   },
 });

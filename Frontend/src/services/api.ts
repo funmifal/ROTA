@@ -292,6 +292,30 @@ export const api = {
     });
   },
 
+  async getBillingLedger(businessId: string): Promise<{ ledger: any }> {
+    return request<{ ledger: any }>(`/api/businesses/${businessId}/billing/ledger`);
+  },
+
+  async previewPlanChange(
+    businessId: string,
+    data: { newPlan: 'STARTER' | 'TEAM' | 'BUSINESS'; newSeats: number }
+  ): Promise<any> {
+    return request<any>(`/api/businesses/${businessId}/billing/proration/preview`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async applyPlanChange(
+    businessId: string,
+    data: { newPlan: 'STARTER' | 'TEAM' | 'BUSINESS'; newSeats: number; idempotencyKey?: string }
+  ): Promise<any> {
+    return request<any>(`/api/businesses/${businessId}/billing/change-plan`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   // Team & Invitations
   async getMembers(businessId: string): Promise<{ members: TeamMember[] }> {
     return request<{ members: TeamMember[] }>(`/api/businesses/${businessId}/members`);
