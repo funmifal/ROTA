@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Effects } from '../../theme/tokens';
@@ -52,20 +53,22 @@ export const MagicLinkModal: React.FC<MagicLinkModalProps> = ({
     }
   };
 
-  const handleVerifyMagicLink = async () => {
-    if (!token.trim()) {
-      setError('Please enter the token from your magic link email.');
+  const handleVerifyMagicLink = async (codeOverride?: string) => {
+    const raw = codeOverride || token;
+    const cleanCode = raw.trim().replace(/\s+/g, '');
+    if (!cleanCode || cleanCode.length !== 6) {
+      setError('Please enter the complete 6-digit login code.');
       return;
     }
 
     try {
       setLoading(true);
       setError('');
-      const res = await api.verifyMagicLink(token.trim());
+      const res = await api.verifyMagicLink(cleanCode);
       onAuthSuccess(res.user);
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to verify magic link.');
+      setError(err.message || 'Invalid or expired login code.');
     } finally {
       setLoading(false);
     }
@@ -89,11 +92,11 @@ export const MagicLinkModal: React.FC<MagicLinkModalProps> = ({
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.modalTitle}>Passwordless Magic Link</Text>
+              <Text style={styles.modalTitle}>Passwordless Magic Login</Text>
               <Text style={styles.modalSubtitle}>
                 {step === 'request'
-                  ? 'Sign in securely without a password using an instant email link.'
-                  : 'Check your email for the magic login link or paste the token below.'}
+                  ? 'Sign in or create an account securely with an instant 6-digit email code.'
+                  : `Enter the 6-digit code sent to ${email || 'your email'}, or tap the link in the email.`}
               </Text>
             </View>
             <TouchableOpacity onPress={handleModalClose} style={styles.closeButton}>
@@ -118,7 +121,7 @@ export const MagicLinkModal: React.FC<MagicLinkModalProps> = ({
                 autoCapitalize="none"
               />
               <Button
-                title="Send Magic Login Link"
+                title="Send 6-Digit Code"
                 onPress={handleRequestMagicLink}
                 loading={loading}
                 variant="primary"
@@ -128,25 +131,37 @@ export const MagicLinkModal: React.FC<MagicLinkModalProps> = ({
                 onPress={() => setStep('verify')}
                 style={styles.switchStepLink}
               >
-                <Text style={styles.switchStepText}>Already have a magic link token? Enter it here</Text>
+                <Text style={styles.switchStepText}>Already have a 6-digit code? Enter it here</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View>
-              <Input
-                label="Magic Link Token"
-                value={token}
-                onChangeText={(val) => {
-                  setToken(val);
-                  setError('');
-                }}
-                placeholder="Paste the token from your email"
-                autoCapitalize="none"
-              />
+              <View style={styles.codeContainer}>
+                <Text style={styles.codeLabel}>6-Digit Login Code</Text>
+                <TextInput
+                  style={styles.codeInput}
+                  value={token}
+                  onChangeText={(val) => {
+                    const numeric = val.replace(/[^0-9]/g, '').slice(0, 6);
+                    setToken(numeric);
+                    setError('');
+                    if (numeric.length === 6) {
+                      handleVerifyMagicLink(numeric);
+                    }
+                  }}
+                  placeholder="123456"
+                  placeholderTextColor={Colors.neutral}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  autoFocus
+                />
+              </View>
+
               <Button
-                title="Log In with Token"
-                onPress={handleVerifyMagicLink}
+                title="Log In with Code"
+                onPress={() => handleVerifyMagicLink()}
                 loading={loading}
+                disabled={token.length !== 6}
                 variant="primary"
                 style={{ marginTop: Spacing.mediumSpacing }}
               />
@@ -154,7 +169,7 @@ export const MagicLinkModal: React.FC<MagicLinkModalProps> = ({
                 onPress={() => setStep('request')}
                 style={styles.switchStepLink}
               >
-                <Text style={styles.switchStepText}>Resend email link</Text>
+                <Text style={styles.switchStepText}>Didn't receive code? Resend email</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -200,6 +215,32 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 4,
+  },
+  codeContainer: {
+    width: '100%',
+    marginTop: Spacing.smallSpacing,
+    marginBottom: Spacing.smallSpacing,
+  },
+  codeLabel: {
+    fontSize: Typography.labelMedium.fontSize,
+    fontWeight: '600',
+    color: Colors.onSurface,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  codeInput: {
+    width: '100%',
+    height: 58,
+    backgroundColor: Colors.surfaceContainerLow,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    textAlign: 'center',
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 8,
+    color: Colors.onSurface,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   switchStepLink: {
     marginTop: Spacing.mediumSpacing,

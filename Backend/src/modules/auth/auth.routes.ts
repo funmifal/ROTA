@@ -28,6 +28,7 @@ router.post('/logout-all', requireAuth, AuthController.logoutAll);
 // Passwordless Magic Link
 router.post('/magic-link', loginRateLimiter, validateBody(magicLinkSchema), AuthController.requestMagicLink);
 router.post('/magic-link/verify', validateBody(verifyMagicLinkSchema), AuthController.verifyMagicLink);
+router.get('/magic-login', AuthController.renderMagicLoginPage);
 
 // Password Reset (Single-use, expiring token)
 router.post('/forgot-password', passwordResetRateLimiter, validateBody(forgotPasswordSchema), AuthController.forgotPassword);

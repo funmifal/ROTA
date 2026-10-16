@@ -371,18 +371,26 @@ If you did not request this, please ignore this email.
   <div class="container">
     <div class="header">Log In to Rota</div>
     <p>Hi there,</p>
-    <p>Click the button below to securely log in to your Rota account without a password:</p>
+    <p>Use this 6-digit code or click the button below to sign in instantly without a password:</p>
+
+    <div style="margin: 24px 0; padding: 20px; background: #f0fdf4; border: 2px dashed #006a60; border-radius: 12px; text-align: center;">
+      <p style="margin: 0 0 10px 0; font-size: 13px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Your 6-Digit Login Code</p>
+      <div style="font-family: monospace; font-size: 38px; font-weight: 800; color: #006a60; letter-spacing: 10px;">${escapeHtml(token)}</div>
+    </div>
+
     <div style="text-align: center;">
       <a href="${magicUrl}" class="button">Log In Instantly</a>
     </div>
+
     <div class="note">
-      This magic link is <strong>single-use</strong> and expires in <strong>15 minutes</strong>.
+      This login code is <strong>single-use</strong> and expires in <strong>15 minutes</strong>.
     </div>
-    <p style="font-size: 13px; color: #64748b;">If you are on your mobile phone, open the app directly:<br>
-      <a href="${deepLinkUrl}" style="color: #006a60;">Open in Rota App</a>
+
+    <p style="font-size: 13px; color: #64748b; text-align: center;">If you are on your mobile phone:<br>
+      <a href="${deepLinkUrl}" style="color: #006a60; font-weight: 600;">Open Directly in Rota App</a>
     </p>
     <div class="footer">
-      If you did not request this login link, you can safely ignore this email.
+      If you did not request this login code, you can safely ignore this email.
     </div>
   </div>
 </body>
@@ -392,10 +400,13 @@ If you did not request this, please ignore this email.
     const textContent = `
 Hi there,
 
-Click this link to log in to Rota:
+Your 6-digit Rota login code is:
+${token}
+
+Or click this link to log in directly:
 ${magicUrl}
 
-This link is single-use and expires in 15 minutes.
+This code is single-use and expires in 15 minutes.
     `.trim();
 
     try {

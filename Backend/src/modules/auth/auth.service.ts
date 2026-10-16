@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../database/prisma';
 import { config } from '../../config/env';
 import { EmailService } from '../../services/email.service';
-import { enqueueVerificationEmail } from '../../queues/email.queue';
+import { enqueueVerificationEmail, enqueueMagicLinkEmail } from '../../queues/email.queue';
 import { generateSecureVerificationCode } from '../../utils/crypto.util';
 import { RegisterInput, LoginInput } from './auth.validation';
 
@@ -319,13 +319,21 @@ export class AuthService {
    */
   static async requestMagicLink(email: string): Promise<{ message: string }> {
     const normalizedEmail = email.trim().toLowerCase();
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     // Invalidate previous magic link tokens for this email
     await prisma.magicLinkToken.deleteMany({
       where: { email: normalizedEmail },
     });
+
+    // Generate unique 6-digit numeric login code
+    let token = generateSecureVerificationCode(6);
+    let attempts = 0;
+    while (attempts < 5 && (await prisma.magicLinkToken.findUnique({ where: { token } }))) {
+      token = generateSecureVerificationCode(6);
+      attempts++;
+    }
+
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     await prisma.magicLinkToken.create({
       data: {
@@ -335,21 +343,22 @@ export class AuthService {
       },
     });
 
-    // Send magic login email
-    await EmailService.sendMagicLinkEmail(normalizedEmail, token);
+    // Dispatch magic login email asynchronously via BullMQ / resilient queue
+    await enqueueMagicLinkEmail({ email: normalizedEmail, token });
 
-    return { message: 'A magic login link has been sent to your email.' };
+    return { message: 'A 6-digit magic login code and link has been sent to your email.' };
   }
 
   /**
-   * Verifies a magic login link token.
+   * Verifies a magic login link token (supports both 6-digit code and link token).
    * Creates an account if none exists, or authenticates the existing user.
    */
   static async verifyMagicLink(token: string): Promise<AuthResponse> {
-    if (!token) throw new Error('Magic link token is required.');
+    const cleanToken = token ? token.trim().replace(/\s+/g, '') : '';
+    if (!cleanToken) throw new Error('Magic login code is required.');
 
     const record = await prisma.magicLinkToken.findUnique({
-      where: { token },
+      where: { token: cleanToken },
     });
 
     if (!record || record.usedAt !== null || record.expiresAt < new Date()) {

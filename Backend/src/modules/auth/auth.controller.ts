@@ -158,6 +158,114 @@ export class AuthController {
   }
 
   /**
+   * Handles GET /magic-login?token=... from magic link email clicks.
+   * Renders a responsive web portal that deep-links directly into the Rota mobile app
+   * and displays the verification token for manual entry.
+   */
+  static async renderMagicLoginPage(req: Request, res: Response): Promise<void> {
+    const token = (req.query.token as string)?.trim();
+
+    if (!token) {
+      if (req.accepts('html')) {
+        res.status(400).send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invalid Magic Link - Rota</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff5f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+    .card { background: white; border-radius: 16px; padding: 40px; max-width: 460px; width: 100%; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    .icon { width: 64px; height: 64px; background: #fee2e2; color: #ba1a1a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 20px; }
+    h1 { color: #ba1a1a; font-size: 22px; margin-bottom: 12px; }
+    p { color: #526350; font-size: 15px; line-height: 1.5; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✕</div>
+    <h1>Missing Token</h1>
+    <p>This magic login link is missing a verification token. Please request a new login link from the Rota app.</p>
+  </div>
+</body>
+</html>
+        `);
+        return;
+      }
+      res.status(400).json({ error: 'ValidationError', message: 'Magic link token is required.' });
+      return;
+    }
+
+    const deepLinkUrl = `rota://magic-login?token=${encodeURIComponent(token)}`;
+
+    if (req.accepts('html')) {
+      res.status(200).send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log In to Rota</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f6f3; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+    .card { background: white; border-radius: 16px; padding: 40px 32px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 10px 30px rgba(0,32,28,0.08); box-sizing: border-box; }
+    .logo { width: 60px; height: 60px; background: #e0f2fe; color: #006a60; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; margin: 0 auto 20px; }
+    h1 { color: #00201c; font-size: 24px; font-weight: 700; margin: 0 0 10px 0; }
+    p { color: #526350; font-size: 15px; line-height: 1.5; margin: 0 0 24px 0; }
+    .button { display: inline-block; background-color: #006a60; color: #ffffff !important; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; transition: background 0.2s; width: 100%; box-sizing: border-box; }
+    .button:hover { background-color: #005048; }
+    .token-box { margin: 24px 0 16px 0; padding: 16px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; text-align: center; }
+    .token-label { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 6px; }
+    .token-code { font-family: monospace; font-size: 14px; font-weight: 700; color: #006a60; word-break: break-all; user-select: all; }
+    .copy-btn { margin-top: 10px; background: #e2e8f0; border: none; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer; }
+    .copy-btn:hover { background: #cbd5e1; }
+    .note { font-size: 12px; color: #94a3b8; margin-top: 20px; }
+  </style>
+  <script>
+    window.onload = function() {
+      // Automatically attempt to launch the Rota mobile app
+      setTimeout(function() {
+        window.location.href = "${deepLinkUrl}";
+      }, 300);
+    };
+
+    function copyToken() {
+      const code = document.getElementById('token-code').innerText;
+      navigator.clipboard.writeText(code).then(function() {
+        const btn = document.getElementById('copy-btn');
+        btn.innerText = 'Copied!';
+        setTimeout(function() { btn.innerText = 'Copy Token'; }, 2000);
+      });
+    }
+  </script>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">⚡</div>
+    <h1>Logging You In...</h1>
+    <p>Opening Rota on your device. If the app does not open automatically, click below:</p>
+    
+    <a href="${deepLinkUrl}" class="button">Open in Rota App</a>
+
+    <div class="token-box">
+      <div class="token-label">Or enter this 6-digit login code manually</div>
+      <div id="token-code" class="token-code" style="font-size: 28px; letter-spacing: 6px;">${escapeHtml(token)}</div>
+      <button id="copy-btn" class="copy-btn" onclick="copyToken()">Copy Code</button>
+    </div>
+
+    <div class="note">This single-use magic login link expires in 15 minutes.</div>
+  </div>
+</body>
+</html>
+      `);
+      return;
+    }
+
+    res.status(200).json({ status: 'ok', token, deepLinkUrl });
+  }
+
+  /**
    * Requests a password reset email with single-use token.
    */
   static async forgotPassword(req: Request, res: Response): Promise<void> {

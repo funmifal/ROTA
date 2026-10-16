@@ -496,22 +496,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess, initialTa
             style={styles.submitButton}
           />
 
-          {/* Passwordless Magic Link Option on Login */}
-          {isLoginTab && (
-            <View style={styles.alternativeAuthContainer}>
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>OR</Text>
-                <View style={styles.dividerLine} />
-              </View>
-              <Button
-                title="Sign in with Magic Link"
-                variant="tonal"
-                onPress={() => setShowMagicLinkModal(true)}
-                style={{ marginTop: Spacing.smallSpacing }}
-              />
+          {/* Passwordless Magic Link Option (Login & Sign-up) */}
+          <View style={styles.alternativeAuthContainer}>
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
             </View>
-          )}
+            <Button
+              title={isLoginTab ? 'Sign in with Magic Link' : 'Sign up with Magic Link'}
+              variant="tonal"
+              onPress={() => setShowMagicLinkModal(true)}
+              style={{ marginTop: Spacing.smallSpacing }}
+            />
+          </View>
         </View>
       </ScrollView>
 

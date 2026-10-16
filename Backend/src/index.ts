@@ -45,7 +45,9 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // Auth module routes
+import { AuthController } from './modules/auth/auth.controller';
 app.use('/api/auth', authRoutes);
+app.get('/magic-login', AuthController.renderMagicLoginPage);
 
 // Business and Team routes
 import businessRoutes from './modules/businesses/business.routes';

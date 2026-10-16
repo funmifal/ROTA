@@ -10,7 +10,7 @@ import { OnboardingScreen } from './src/features/auth/OnboardingScreen';
 import { AuthScreen } from './src/features/auth/AuthScreen';
 import { DashboardScreen } from './src/features/business/DashboardScreen';
 import { InviteAcceptanceModal } from './src/features/team/InviteAcceptanceModal';
-import { User, Business } from './src/services/api';
+import { api, User, Business } from './src/services/api';
 
 type AppState = 'splash' | 'onboarding' | 'auth' | 'dashboard';
 
@@ -55,12 +55,31 @@ function MainAppContent() {
 
   const showToast = useAppStore((s) => s.showToast);
 
-  // Deep linking handler: listens to incoming links (rota://invite?token=XYZ or https://rota.app/invite/XYZ)
+  // Deep linking handler: listens to incoming links (rota://invite, rota://magic-login, rota://billing)
   useEffect(() => {
     const handleUrl = (url: string | null) => {
       if (!url) return;
       try {
         const parsed = Linking.parse(url);
+        // Check for magic link login (rota://magic-login?token=XYZ or https://.../magic-login?token=XYZ)
+        if (parsed.path?.includes('magic-login') || parsed.hostname === 'magic-login') {
+          const token =
+            (parsed.queryParams?.token as string) ||
+            parsed.path?.split('magic-login/')[1]?.split('?')[0];
+          if (token) {
+            api
+              .verifyMagicLink(token)
+              .then((res) => {
+                setCurrentUser(res.user);
+                setAppState('dashboard');
+                showToast(`✨ Welcome to Rota, ${res.user.name || 'there'}!`, 'success');
+              })
+              .catch((err: any) => {
+                showToast(err.message || 'Invalid or expired magic link. Please request a new one.', 'error');
+              });
+          }
+        }
+
         // Check for invitation deep links
         if (parsed.path?.includes('invite') || parsed.hostname === 'invite') {
           const token =
